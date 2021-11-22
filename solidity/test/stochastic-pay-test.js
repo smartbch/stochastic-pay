@@ -4,16 +4,24 @@ const { TypedDataUtils } = require('ethers-eip712');
 
 describe("StochasticPay", function () {
 
+  const payerSalt = ethers.utils.id("payerSalt");
+  const payeeSalt = ethers.utils.id("payeeSalt");
+  const payeeSaltHash = ethers.utils.keccak256('0x00' + (BigInt(payeeSalt) >> 8n).toString(16));
+  // console.log('payerSalt:', payerSalt);
+  // console.log('payeeSalt:', payeeSalt);
+  // console.log('payeeSaltHash:', payeeSaltHash);
+
   let payer, payee;
   let stochasticPay;
   let myToken;
 
   before(async function () {
-    // [payer, payee] = await ethers.getSigners();
-    payer = new ethers.Wallet('82c149d8f7257a6ab690d351d482de51e3540a95859a72a96ef5d744e1f69d60');
-    payee = new ethers.Wallet('f37a49a536c941829424a502bb4579f2ab5451c7104c8541e7797798f3daf4ec');
+    const [acc0] = await ethers.getSigners();
+    payer = new ethers.Wallet('82c149d8f7257a6ab690d351d482de51e3540a95859a72a96ef5d744e1f69d60', acc0.provider);
+    payee = new ethers.Wallet('f37a49a536c941829424a502bb4579f2ab5451c7104c8541e7797798f3daf4ec', acc0.provider);
     // console.log('payer:', payer.address);
     // console.log('payee:', payee.address);
+    await acc0.sendTransaction({to: payer.address, value: ethers.utils.parseEther("1.0")});
 
     const StochasticPay = await ethers.getContractFactory("StochasticPay");
     stochasticPay = await StochasticPay.deploy();
@@ -25,14 +33,7 @@ describe("StochasticPay", function () {
   });
 
   it("getEIP712Hash", async function () {
-    const payerSalt = ethers.utils.id("payerSalt");
-    const payeeSalt = ethers.utils.id("payeeSalt");
-    const payeeSaltHash = ethers.utils.keccak256('0x00' + (BigInt(payeeSalt) >> 8n).toString(16));
-    // console.log('payerSalt:', payerSalt);
-    // console.log('payeeSalt:', payeeSalt);
-    // console.log('payeeSaltHash:', payeeSaltHash);
-
-    const dueTime64 = 1637579519;//Math.floor(Date.now() / 1000) + 3600;
+    const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0x12345678;
  
     const msg = {
@@ -51,11 +52,7 @@ describe("StochasticPay", function () {
   });
 
   it("getPayer", async function () {
-    const payerSalt = ethers.utils.id("payerSalt");
-    const payeeSalt = ethers.utils.id("payeeSalt");
-    const payeeSaltHash = ethers.utils.keccak256('0x00' + (BigInt(payeeSalt) >> 8n).toString(16));
-
-    const dueTime64 = 1637579519;//Math.floor(Date.now() / 1000) + 3600;
+    const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0x12345678;
  
     const msg = {
@@ -75,8 +72,108 @@ describe("StochasticPay", function () {
     expect(payerAddr).to.equal(payer.address);
   });
 
+  it("pay:ok", async function () {
+    const payerAllowance = 0x123456;
+    const payAmount = 0x9876;
+    await myToken.transfer(payer.address, payAmount + 1);
+    await myToken.connect(payer).approve(stochasticPay.address, payerAllowance);
+
+    const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
+    const prob32 = 0xFFFFFFFF;
+ 
+    const msg = {
+      payerSalt: payerSalt,
+      payeeSaltHash: payeeSaltHash,
+      payeeAddr_dueTime64_prob32: concatPayeeAddrDueTime64Prob32(payee.address, dueTime64, prob32),
+      payerAllowance: payerAllowance,
+      sep20Contract_amount: concatSep20ContractAmount(myToken.address, payAmount),
+    }
+
+    const [r, s, v] = signRawMsg(stochasticPay.address, msg, payer);
+    // console.log('r:', r);
+    // console.log('s:', s);
+    // console.log('v:', v);
+    await pay(stochasticPay, msg, payeeSalt, r, s, v);
+
+    expect(await myToken.balanceOf(payer.address)).to.equal(1);
+    expect(await myToken.balanceOf(payee.address)).to.equal(payAmount);
+  });
+
+  it("pay:failed:EXPIRED", async function () {
+    const dueTime64 = Math.floor(Date.now() / 1000) - 3600;
+    const prob32 = 0xFFFFFFFF;
+ 
+    const msg = {
+      payerSalt: payerSalt,
+      payeeSaltHash: payeeSaltHash,
+      payeeAddr_dueTime64_prob32: concatPayeeAddrDueTime64Prob32(payee.address, dueTime64, prob32),
+      payerAllowance: 0x123456,
+      sep20Contract_amount: concatSep20ContractAmount(myToken.address, 0x9876),
+    }
+
+    const [r, s, v] = signRawMsg(stochasticPay.address, msg, payer);
+    await expect(pay(stochasticPay, msg, payeeSalt, r, s, v)).to.be.revertedWith("EXPIRED");
+  });
+
+  it("pay:failed:ALLOWANCE_MISMATCH", async function () {
+    const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
+    const prob32 = 0xFFFFFFFF;
+ 
+    const msg = {
+      payerSalt: payerSalt,
+      payeeSaltHash: payeeSaltHash,
+      payeeAddr_dueTime64_prob32: concatPayeeAddrDueTime64Prob32(payee.address, dueTime64, prob32),
+      payerAllowance: 0x123456,
+      sep20Contract_amount: concatSep20ContractAmount(myToken.address, 0x9876),
+    }
+
+    const [r, s, v] = signRawMsg(stochasticPay.address, msg, payer);
+    await expect(pay(stochasticPay, msg, payeeSalt, r, s, v)).to.be.revertedWith("ALLOWANCE_MISMATCH");
+  });
+
+  it("pay:failed:INCORRECT_SALT", async function () {
+    const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
+    const prob32 = 0xFFFFFFFF;
+
+    const msg = {
+      payerSalt: payerSalt,
+      payeeSaltHash: '0xffffff' + payeeSaltHash.substring(8),
+      payeeAddr_dueTime64_prob32: concatPayeeAddrDueTime64Prob32(payee.address, dueTime64, prob32),
+      payerAllowance: await myToken.allowance(payer.address, stochasticPay.address),
+      sep20Contract_amount: concatSep20ContractAmount(myToken.address, 0x9876),
+    }
+
+    const [r, s, v] = signRawMsg(stochasticPay.address, msg, payer);
+    await expect(pay(stochasticPay, msg, payeeSalt, r, s, v)).to.be.revertedWith("INCORRECT_SALT");
+  });
+
+  it("pay:failed:INCORRECT_SALT", async function () {
+    const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
+    const prob32 = 0x00000001;
+
+    const msg = {
+      payerSalt: payerSalt,
+      payeeSaltHash: payeeSaltHash,
+      payeeAddr_dueTime64_prob32: concatPayeeAddrDueTime64Prob32(payee.address, dueTime64, prob32),
+      payerAllowance: await myToken.allowance(payer.address, stochasticPay.address),
+      sep20Contract_amount: concatSep20ContractAmount(myToken.address, 0x9876),
+    }
+
+    const [r, s, v] = signRawMsg(stochasticPay.address, msg, payer);
+    await expect(pay(stochasticPay, msg, payeeSalt, r, s, v)).to.be.revertedWith("CONNOT_PAY");
+  });
+
 });
 
+function getEIP712HashSol(stochasticPay, msg) {
+  return stochasticPay.getEIP712Hash(
+    msg.payerSalt,
+    msg.payeeSaltHash,
+    msg.payeeAddr_dueTime64_prob32,
+    msg.payerAllowance,
+    msg.sep20Contract_amount,
+  );
+}
 function getPayer(stochasticPay, msg, payeeSalt, r, s, v) {
   return stochasticPay.getPayer(
     concatPayeeSaltV(payeeSalt, v),
@@ -88,13 +185,15 @@ function getPayer(stochasticPay, msg, payeeSalt, r, s, v) {
     r, s,
   );
 }
-function getEIP712HashSol(stochasticPay, msg) {
-  return stochasticPay.getEIP712Hash(
+function pay(stochasticPay, msg, payeeSalt, r, s, v) {
+  return stochasticPay.pay(
+    concatPayeeSaltV(payeeSalt, v),
     msg.payerSalt,
     msg.payeeSaltHash,
     msg.payeeAddr_dueTime64_prob32,
     msg.payerAllowance,
     msg.sep20Contract_amount,
+    r, s,
   );
 }
 
