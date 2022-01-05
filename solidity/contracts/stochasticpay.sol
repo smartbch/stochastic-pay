@@ -91,5 +91,44 @@ contract StochasticPay {
 		require(uint32(uint(saltSumHash)) < prob32, "CONNOT_PAY");
 		IERC20(sep20Contract).transferFrom(payerAddr, payeeAddr, amount);
 	}
+
+	function payXY(uint256 payeeSalt_v, //payeeSalt: a random number provided by payee, v: the "v" of signature
+		       uint256 payeeXAddr_payerSalt96, //payeeXAddr: the address of payeeX
+		         //payerSalt96: a random number provided by payer
+		       bytes32 payeeSaltHash, //the hash of a random number provided by payee
+		       uint256 payeeYAddr_dueTime64_prob32, //payeeYddr: the address of payeeY
+		         // dueTime64: when the payment commitment expires
+		         // prob32: the probability of this payment
+		       uint256 payerAllowance, //payer's current allowance to this contract
+		       uint256 sep20Contract_amount, // which coin and how many coins 
+		       bytes32 r, bytes32 s) external {
+
+		address payerAddr = getPayer(payeeSalt_v,
+					     payeeXAddr_payerSalt96,
+					     payeeSaltHash,
+					     payeeYAddr_dueTime64_prob32,
+					     payerAllowance,
+					     sep20Contract_amount,
+					     r, s);
+
+		address payeeAddr = address(bytes20(uint160(payeeYAddr_dueTime64_prob32>>96)));
+		uint prob32 = uint32(payeeYAddr_dueTime64_prob32);
+		address sep20Contract = address(bytes20(uint160(sep20Contract_amount>>96)));
+		uint amount = uint(uint96(sep20Contract_amount));
+		{
+			uint64 dueTime64 = uint64(payeeYAddr_dueTime64_prob32>>32);
+			require(block.timestamp < dueTime64, "EXPIRED");
+			uint allowance = IERC20(sep20Contract).allowance(payerAddr, address(this));
+			require(allowance == payerAllowance, "ALLOWANCE_MISMATCH"); //To prevent replay
+		}
+		payeeSalt_v >>= 8; //remove the v
+		require(payeeSaltHash == keccak256(abi.encodePacked(payeeSalt_v)), "INCORRECT_SALT");
+		uint saltSumHash = uint(keccak256(abi.encodePacked(payeeXAddr_payerSalt96, payeeSalt_v)));
+		require(uint(uint128(saltSumHash))%10000 < (prob32&0xFFFF)%10000, "CONNOT_PAY");
+		if((saltSumHash>>128)%10000 < (prob32>>16)%10000) {//switch payee from Y to X
+			payeeAddr = address(bytes20(uint160(payeeXAddr_payerSalt96>>96)));
+		}
+		IERC20(sep20Contract).transferFrom(payerAddr, payeeAddr, amount);
+	}
 }
 
