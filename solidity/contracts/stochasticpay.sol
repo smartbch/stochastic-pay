@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.9;
 
-import "./IERC20.sol";
-
 contract StochasticPay {
 	bytes32 private constant SALT = keccak256(abi.encodePacked("StochasticPay"));
 	uint256 private constant CHAINID = 10000; // smartBCH mainnet
@@ -57,6 +55,13 @@ contract StochasticPay {
 		return ecrecover(eip712Hash, v, r, s);
 	}
 
+	function _allowance(address coin, address owner, address spender) private returns (uint) {
+		(bool success, bytes memory data) = coin.call(
+		    abi.encodeWithSignature("allowance(address,address)", owner, spender));
+		require(success, "ALLOWANCE_FAIL");
+		return abi.decode(data, (uint));
+	}
+
 	function pay(uint256 payeeSalt_v, //payeeSalt: a random number provided by payee, v: the "v" of signature
 		     uint256 payerSalt, //a random number provided by payer
 		     bytes32 payeeSaltHash, //the hash of a random number provided by payee
@@ -82,14 +87,16 @@ contract StochasticPay {
 		{
 			uint64 dueTime64 = uint64(payeeAddr_dueTime64_prob32>>32);
 			require(block.timestamp < dueTime64, "EXPIRED");
-			uint allowance = IERC20(sep20Contract).allowance(payerAddr, address(this));
+			uint allowance = _allowance(sep20Contract, payerAddr, address(this));
 			require(allowance == payerAllowance, "ALLOWANCE_MISMATCH"); //To prevent replay
 		}
 		payeeSalt_v >>= 8; //remove the v
 		require(payeeSaltHash == keccak256(abi.encodePacked(payeeSalt_v)), "INCORRECT_SALT");
 		bytes32 saltSumHash = keccak256(abi.encodePacked(payerSalt+payeeSalt_v));
 		require(uint32(uint(saltSumHash)) < prob32, "CONNOT_PAY");
-		IERC20(sep20Contract).transferFrom(payerAddr, payeeAddr, amount);
+		(bool success, bytes memory _notUsed) = sep20Contract.call(
+		    abi.encodeWithSignature("transferFrom(address,address,uint256)", payerAddr, payeeAddr, amount));
+		require(success, "TRANSFERFROM_FAIL");
 	}
 
 	function payXY(uint256 payeeSalt_v, //payeeSalt: a random number provided by payee, v: the "v" of signature
@@ -118,7 +125,7 @@ contract StochasticPay {
 		{
 			uint64 dueTime64 = uint64(payeeYAddr_dueTime64_prob32>>32);
 			require(block.timestamp < dueTime64, "EXPIRED");
-			uint allowance = IERC20(sep20Contract).allowance(payerAddr, address(this));
+			uint allowance = _allowance(sep20Contract, payerAddr, address(this));
 			require(allowance == payerAllowance, "ALLOWANCE_MISMATCH"); //To prevent replay
 		}
 		payeeSalt_v >>= 8; //remove the v
@@ -128,7 +135,9 @@ contract StochasticPay {
 		if((saltSumHash>>128)%10000 < (prob32>>16)%10000) {//switch payee from Y to X
 			payeeAddr = address(bytes20(uint160(payeeXAddr_payerSalt96>>96)));
 		}
-		IERC20(sep20Contract).transferFrom(payerAddr, payeeAddr, amount);
+		(bool success, bytes memory _notUsed) = sep20Contract.call(
+		    abi.encodeWithSignature("transferFrom(address,address,uint256)", payerAddr, payeeAddr, amount));
+		require(success, "TRANSFERFROM_FAIL");
 	}
 }
 
