@@ -14,7 +14,7 @@ contract StochasticPay_VRF {
 	bytes32 private constant DAPP_HASH = keccak256(abi.encodePacked("stochastic_payment"));
 	bytes32 private constant VERSION_HASH = keccak256(abi.encodePacked("v0.1.0"));
 	bytes32 private constant TYPE_HASH_SR= keccak256(abi.encodePacked("Pay(uint256 payerSalt_pk0,uint256 pkTail,uint256 payeeAddr_dueTime64_prob32,uint256 walletOldSatus,uint256 sep20Contract_amount)"));
-	bytes32 private constant TYPE_HASH = keccak256(abi.encodePacked("Pay(uint256 payerSalt,bytes32 pkHashRoot,uint256 sep20Contract_dueTime64_prob32,uint256 seenNonces,uint256 payeeAddrA_amountA,uint256 payeeAddrB_amountB)"));
+	bytes32 private constant TYPE_HASH_AB = keccak256(abi.encodePacked("Pay(uint256 payerSalt,bytes32 pkHashRoot,uint256 sep20Contract_dueTime64_prob32,uint256 seenNonces,uint256 payeeAddrA_amountA,uint256 payeeAddrB_amountB)"));
 
 	function safeReceive(address coinType, uint amount) internal returns (uint96) {
 		uint realAmount = amount;
@@ -42,18 +42,18 @@ contract StochasticPay_VRF {
 
 	function saveWallet(bytes memory keyBz, uint nonces, uint balance) internal {
 		bytes memory valueBz = abi.encode(nonces, balance);
-		(bool success, bytes memory _notUsed) = SEP101Contract.delegatecall(
-		    abi.encodeWithSignature("set(bytes,bytes)", keyBz, valueBz));
+		(bool success, /*bytes memory _notUsed*/) = SEP101Contract.delegatecall(
+			abi.encodeWithSignature("set(bytes,bytes)", keyBz, valueBz));
 		require(success, "SEP101_SET_FAIL");
 	}
 
 	function loadWallet(bytes memory keyBz) internal returns (uint nonces, uint balance) {
         	(bool success, bytes memory data) = SEP101Contract.delegatecall(
-        	    abi.encodeWithSignature("get(bytes)", keyBz));
+        		abi.encodeWithSignature("get(bytes)", keyBz));
 
         	require(success && (data.length == 32 * 2 || data.length == 32 * 4));
         	if (data.length == 32 * 2) {
-        	    return (0, 0);
+        		return (0, 0);
         	}
 
 		bytes memory valueBz;
@@ -82,13 +82,13 @@ contract StochasticPay_VRF {
 
 	// sr = single receiver
 	function getEIP712Hash_sr(uint256 payerSalt_pk0,
-			       //payerSalt: a random 240b number provided by payer, pk0: first byte of pk
-			       uint256 pkTail, //The other bytes (1~32) of pk
-			       uint256 payeeAddr_dueTime64_prob32, //payeeAddr: the address of payee
-			         // dueTime64: when the payment commitment expires
-				 // prob32: the probability of this payment
-			       uint256 walletOldSatus, //payer's current allowance to this contract
-			       uint256 sep20Contract_amount // which coin and how many coins 
+			            //payerSalt: a random 240b number provided by payer, pk0: first byte of pk
+			          uint256 pkTail, //The other bytes (1~32) of pk
+			          uint256 payeeAddr_dueTime64_prob32, //payeeAddr: the address of payee
+			            // dueTime64: when the payment commitment expires
+			            // prob32: the probability of this payment
+			          uint256 walletOldSatus, //payer's current allowance to this contract
+			          uint256 sep20Contract_amount // which coin and how many coins 
 		) public view returns (bytes32) {
 		bytes32 DOMAIN_SEPARATOR = keccak256(abi.encode(
 						     EIP712_DOMAIN_TYPEHASH,
@@ -101,25 +101,25 @@ contract StochasticPay_VRF {
 			"\x19\x01",
 			DOMAIN_SEPARATOR,
 			keccak256(abi.encode(
-				TYPE_HASH_SR,
-				payerSalt_pk0,
-				pkTail,
-				payeeAddr_dueTime64_prob32,
-				walletOldSatus,
-				sep20Contract_amount
+				  TYPE_HASH_SR,
+				  payerSalt_pk0,
+				  pkTail,
+				  payeeAddr_dueTime64_prob32,
+				  walletOldSatus,
+				  sep20Contract_amount
 			))
 		));
 	}
 
-	function getEIP712Hash(uint256 payerSalt,
-			       //payerSalt: a random 240b number provided by payer, pk0: first byte of pk
-			       bytes32 pkHashRoot, //The merkle root of vrf pubkeys
-			       uint256 sep20Contract_dueTime64_prob32,
-			         // dueTime64: when the payment commitment expires
-			         // prob32: the probability of this payment
-			       uint256 seenNonces, //payer's current allowance to this contract
-			       uint256 payeeAddrA_amountA,
-			       uint256 payeeAddrB_amountB
+	function getEIP712Hash_ab(uint256 payerSalt,
+			          //payerSalt: a random 240b number provided by payer, pk0: first byte of pk
+			          bytes32 pkHashRoot, //The merkle root of vrf pubkeys
+			          uint256 sep20Contract_dueTime64_prob32,
+			            // dueTime64: when the payment commitment expires
+			            // prob32: the probability of this payment
+			          uint256 seenNonces, //payer's current allowance to this contract
+			          uint256 payeeAddrA_amountA,
+			          uint256 payeeAddrB_amountB
 		) public view returns (bytes32) {
 		bytes32 DOMAIN_SEPARATOR = keccak256(abi.encode(
 						     EIP712_DOMAIN_TYPEHASH,
@@ -132,13 +132,13 @@ contract StochasticPay_VRF {
 			"\x19\x01",
 			DOMAIN_SEPARATOR,
 			keccak256(abi.encode(
-				TYPE_HASH,
-				payerSalt,
-				pkHashRoot,
-				sep20Contract_dueTime64_prob32,
-				seenNonces,
-				payeeAddrA_amountA,
-				payeeAddrB_amountB
+				  TYPE_HASH_AB,
+				  payerSalt,
+				  pkHashRoot,
+				  sep20Contract_dueTime64_prob32,
+				  seenNonces,
+				  payeeAddrA_amountA,
+				  payeeAddrB_amountB
 			))
 		));
 	}
@@ -150,28 +150,28 @@ contract StochasticPay_VRF {
 			     uint256 sep20Contract_amount,
 			     bytes32 r, bytes32 s) public view returns (address) {
 		bytes32 eip712Hash = getEIP712Hash_sr(payerSalt_pk0_v>>8,
-					     pkTail,
-					     payeeAddr_dueTime64_prob32,
-					     seenNonces,
-					     sep20Contract_amount);
+					              pkTail,
+					              payeeAddr_dueTime64_prob32,
+					              seenNonces,
+					              sep20Contract_amount);
 		uint8 v = uint8(payerSalt_pk0_v); //the lowest byte is v
 		return ecrecover(eip712Hash, v, r, s);
 	}
 
-	function getPayer(uint256 payerSalt,
-			  bytes32 pkHashRoot,
-			  uint256 sep20Contract_dueTime64_prob32,
-			  uint256 seenNonces,
-			  uint256 payeeAddrA_amountA,
-			  uint256 payeeAddrB_amountB,
-			  uint8 v,
-			  bytes32 r, bytes32 s) public view returns (address) {
-		bytes32 eip712Hash = getEIP712Hash(payerSalt,
-					           pkHashRoot,
-					           sep20Contract_dueTime64_prob32,
-					           seenNonces,
-					           payeeAddrA_amountA,
-					           payeeAddrB_amountB);
+	function getPayer_ab(uint256 payerSalt,
+			     bytes32 pkHashRoot,
+			     uint256 sep20Contract_dueTime64_prob32,
+			     uint256 seenNonces,
+			     uint256 payeeAddrA_amountA,
+			     uint256 payeeAddrB_amountB,
+			     uint8 v,
+			     bytes32 r, bytes32 s) public view returns (address) {
+		bytes32 eip712Hash = getEIP712Hash_ab(payerSalt,
+					              pkHashRoot,
+					              sep20Contract_dueTime64_prob32,
+					              seenNonces,
+					              payeeAddrA_amountA,
+					              payeeAddrB_amountB);
 		return ecrecover(eip712Hash, v, r, s);
 	}
 
@@ -290,14 +290,14 @@ contract StochasticPay_VRF {
 		bytes32 leaf = keccak256(abi.encodePacked(uint8(tmp>>8), params.pkTail));
 		require(verifyMerkle(proof, params.pkHashRoot, leaf, tmp>>16), "VERIFY_FAILED");
 
-		address payerAddr = getPayer(params.payerSalt,
-					     params.pkHashRoot,
-					     params.sep20Contract_dueTime64_prob32,
-					     params.seenNonces,
-					     params.payeeAddrA_amountA,
-					     params.payeeAddrB_amountB,
-					     uint8(tmp),
-					     params.r, params.s);
+		address payerAddr = getPayer_ab(params.payerSalt,
+					        params.pkHashRoot,
+					        params.sep20Contract_dueTime64_prob32,
+					        params.seenNonces,
+					        params.payeeAddrA_amountA,
+					        params.payeeAddrB_amountB,
+					        uint8(tmp),
+					        params.r, params.s);
 
 		bytes memory keyBz = abi.encode(sep20Contract, payerAddr);
 		(uint nonces, uint balance) = loadWallet(keyBz);
