@@ -13,7 +13,10 @@ contract StochasticPay_VRF {
 	bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(abi.encodePacked(EIP712_DOMAIN));
 	bytes32 private constant DAPP_HASH = keccak256(abi.encodePacked("stochastic_payment"));
 	bytes32 private constant VERSION_HASH = keccak256(abi.encodePacked("v0.1.0"));
-	bytes32 private constant TYPE_HASH_SR= keccak256(abi.encodePacked("Pay(uint256 payerSalt_pk0,uint256 pkTail,uint256 payeeAddr_dueTime64_prob32,uint256 walletOldSatus,uint256 sep20Contract_amount)"));
+	// SR: single receiver; the vrf-pubkey's owner decides whether the payment happens.
+	bytes32 private constant TYPE_HASH_SR= keccak256(abi.encodePacked("Pay(uint256 payerSalt_pk0,uint256 pkTail,uint256 payeeAddr_dueTime64_prob32,uint256 seenNonces,uint256 sep20Contract_amount)"));
+	// AB: two receivers, A and B; several vrf-pubkeys' owners decides whether the payment happens
+	// usually A is an EOA and B is a contract whose beneficiary own the vrf-pubkeys
 	bytes32 private constant TYPE_HASH_AB = keccak256(abi.encodePacked("Pay(uint256 payerSalt,bytes32 pkHashRoot,uint256 sep20Contract_dueTime64_prob32,uint256 seenNonces,uint256 payeeAddrA_amountA,uint256 payeeAddrB_amountB)"));
 
 	function safeReceive(address coinType, uint amount) internal returns (uint96) {
@@ -80,14 +83,13 @@ contract StochasticPay_VRF {
 		saveWallet(keyBz, nonces, balance - amount);
 	}
 
-	// sr = single receiver
 	function getEIP712Hash_sr(uint256 payerSalt_pk0,
 			            //payerSalt: a random 240b number provided by payer, pk0: first byte of pk
 			          uint256 pkTail, //The other bytes (1~32) of pk
 			          uint256 payeeAddr_dueTime64_prob32, //payeeAddr: the address of payee
 			            // dueTime64: when the payment commitment expires
 			            // prob32: the probability of this payment
-			          uint256 walletOldSatus, //payer's current allowance to this contract
+			          uint256 seenNonces, //the last status of nonces seen by the payer
 			          uint256 sep20Contract_amount // which coin and how many coins 
 		) public view returns (bytes32) {
 		bytes32 DOMAIN_SEPARATOR = keccak256(abi.encode(
@@ -105,7 +107,7 @@ contract StochasticPay_VRF {
 				  payerSalt_pk0,
 				  pkTail,
 				  payeeAddr_dueTime64_prob32,
-				  walletOldSatus,
+				  seenNonces,
 				  sep20Contract_amount
 			))
 		));
@@ -117,7 +119,7 @@ contract StochasticPay_VRF {
 			          uint256 sep20Contract_dueTime64_prob32,
 			            // dueTime64: when the payment commitment expires
 			            // prob32: the probability of this payment
-			          uint256 seenNonces, //payer's current allowance to this contract
+			          uint256 seenNonces, //the last status of nonces seen by the payer
 			          uint256 payeeAddrA_amountA,
 			          uint256 payeeAddrB_amountB
 		) public view returns (bytes32) {
@@ -183,7 +185,7 @@ contract StochasticPay_VRF {
 			 (uint(uint8(beta[1]))<<8) | (uint(uint8(beta[0])));
 	}
 
-	function getRand32(uint256 alpha, uint8 pk0, uint256 pkTail, bytes calldata pi) private returns (uint) {
+	function getRand32_ab(uint256 alpha, uint8 pk0, uint256 pkTail, bytes calldata pi) private returns (uint) {
 		(bool ok, bytes memory beta) = address(VRF_PRECOMPILE).call(abi.encodePacked(alpha, pk0, pkTail, pi));
 		require(ok, "VRF_FAIL");
 		return (uint(uint8(beta[3]))<<24) | (uint(uint8(beta[2]))<<16) |
@@ -282,7 +284,7 @@ contract StochasticPay_VRF {
 		{
 			uint64 dueTime64 = uint64(tmp>>32);
 			require(block.timestamp < dueTime64, "EXPIRED");
-			uint rand32 = getRand32(params.payerSalt, uint8(params.index_pk0_v>>8), params.pkTail, pi);
+			uint rand32 = getRand32_ab(params.payerSalt, uint8(params.index_pk0_v>>8), params.pkTail, pi);
 			uint prob32 = uint(uint32(tmp));
 			require(rand32 < prob32, "CONNOT_PAY");
 		}
@@ -310,9 +312,11 @@ contract StochasticPay_VRF {
 		address payeeAddrB = address(bytes20(uint160(params.payeeAddrB_amountB>>96)));
 		uint amountB = uint(uint96(params.payeeAddrB_amountB));
 		saveWallet(keyBz, nonces, balance - amountA - amountB);
-		keyBz = abi.encode(sep20Contract, payeeAddrA);
-		(nonces, balance) = loadWallet(keyBz);
-		saveWallet(keyBz, nonces, balance + amountA);
+		if(amountA != 0) {
+			keyBz = abi.encode(sep20Contract, payeeAddrA);
+			(nonces, balance) = loadWallet(keyBz);
+			saveWallet(keyBz, nonces, balance + amountA);
+		}
 		keyBz = abi.encode(sep20Contract, payeeAddrB);
 		(nonces, balance) = loadWallet(keyBz);
 		saveWallet(keyBz, nonces, balance + amountB);
