@@ -65,7 +65,7 @@ contract StochasticPay_VRF {
 	}
 
 	function deposit(address owner, uint sep20Contract_amount) public payable {
-		address sep20Contract = address(uint160(sep20Contract_amount>>64));
+		address sep20Contract = address(uint160(sep20Contract_amount>>96));
 		uint amount = uint96(sep20Contract_amount);
 		safeReceive(sep20Contract, amount);
 		bytes memory keyBz = abi.encode(sep20Contract, owner);
@@ -74,7 +74,7 @@ contract StochasticPay_VRF {
 	}
 
 	function withdraw(uint sep20Contract_amount) public {
-		address sep20Contract = address(uint160(sep20Contract_amount>>64));
+		address sep20Contract = address(uint160(sep20Contract_amount>>96));
 		uint amount = uint96(sep20Contract_amount);
 		bytes memory keyBz = abi.encode(sep20Contract, msg.sender);
 		(uint nonces, uint balance) = loadWallet(keyBz);
