@@ -3,7 +3,7 @@ pragma solidity 0.8.9;
 
 import "./IERC20.sol";
 
-contract StochasticPay {
+contract StochasticPay_3rd {
 	uint256 private constant RAND_DIV = 50000;
 	address private constant VRF_PRECOMPILE = address(0x2713); // the VRF precompile contract's address 
 	bytes32 private constant SALT = keccak256(abi.encodePacked("StochasticPay"));

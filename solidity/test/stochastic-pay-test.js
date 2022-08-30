@@ -7,9 +7,9 @@ describe("StochasticPay", function () {
   const payerSalt = ethers.utils.id("payerSalt");
   const payeeSalt = ethers.utils.id("payeeSalt");
   const payeeSaltHash = ethers.utils.keccak256('0x00' + (BigInt(payeeSalt) >> 8n).toString(16));
-  // console.log('payerSalt:', payerSalt);
-  // console.log('payeeSalt:', payeeSalt);
-  // console.log('payeeSaltHash:', payeeSaltHash);
+  console.log('payerSalt:', payerSalt);
+  console.log('payeeSalt:', payeeSalt);
+  console.log('payeeSaltHash:', payeeSaltHash);
 
   let payer, payee;
   let stochasticPay;
@@ -147,7 +147,7 @@ describe("StochasticPay", function () {
     await expect(pay(stochasticPay, msg, payeeSalt, r, s, v)).to.be.revertedWith("INCORRECT_SALT");
   });
 
-  it("pay:failed:INCORRECT_SALT", async function () {
+  it("pay:failed:CANNOT_PAY", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0x00000001;
 
@@ -160,7 +160,7 @@ describe("StochasticPay", function () {
     }
 
     const [r, s, v] = signRawMsg(stochasticPay.address, msg, payer);
-    await expect(pay(stochasticPay, msg, payeeSalt, r, s, v)).to.be.revertedWith("CONNOT_PAY");
+    await expect(pay(stochasticPay, msg, payeeSalt, r, s, v)).to.be.revertedWith("CANNOT_PAY");
   });
 
 });

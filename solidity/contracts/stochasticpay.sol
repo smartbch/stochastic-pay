@@ -93,7 +93,7 @@ contract StochasticPay {
 		payeeSalt_v >>= 8; //remove the v
 		require(payeeSaltHash == keccak256(abi.encodePacked(payeeSalt_v)), "INCORRECT_SALT");
 		bytes32 saltSumHash = keccak256(abi.encodePacked(payerSalt+payeeSalt_v));
-		require(uint32(uint(saltSumHash)) < prob32, "CONNOT_PAY");
+		require(uint32(uint(saltSumHash)) < prob32, "CANNOT_PAY");
 		(bool success, /*bytes memory _notUsed*/) = sep20Contract.call(
 		    abi.encodeWithSignature("transferFrom(address,address,uint256)", payerAddr, payeeAddr, amount));
 		require(success, "TRANSFERFROM_FAIL");
@@ -131,7 +131,7 @@ contract StochasticPay {
 		payeeSalt_v >>= 8; //remove the v
 		require(payeeSaltHash == keccak256(abi.encodePacked(payeeSalt_v)), "INCORRECT_SALT");
 		uint saltSumHash = uint(keccak256(abi.encodePacked(payeeXAddr_payerSalt96, payeeSalt_v)));
-		require(uint(uint128(saltSumHash))%10000 < (prob32&0xFFFF)%10000, "CONNOT_PAY");
+		require(uint(uint128(saltSumHash))%10000 < (prob32&0xFFFF)%10000, "CANNOT_PAY");
 		if((saltSumHash>>128)%10000 < (prob32>>16)%10000) {//switch payee from Y to X
 			payeeAddr = address(bytes20(uint160(payeeXAddr_payerSalt96>>96)));
 		}
