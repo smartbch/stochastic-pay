@@ -33,7 +33,7 @@ contract StochasticPay_VRF {
 		return uint96(realAmount);
 	}
 	
-	function safeTransfer(address coinType, address receiver, uint amount) internal {
+	function safeTransfer(address coinType, address receiver, uint amount) internal virtual {
 		if(amount == 0) {
 			return;
 		}
@@ -43,14 +43,14 @@ contract StochasticPay_VRF {
 		require(success && ret, "trans-fail");
 	}
 
-	function saveWallet(bytes memory keyBz, uint nonces, uint balance) internal {
+	function saveWallet(bytes memory keyBz, uint nonces, uint balance) internal virtual {
 		bytes memory valueBz = abi.encode(nonces, balance);
 		(bool success, /*bytes memory _notUsed*/) = SEP101Contract.delegatecall(
 			abi.encodeWithSignature("set(bytes,bytes)", keyBz, valueBz));
 		require(success, "SEP101_SET_FAIL");
 	}
 
-	function loadWallet(bytes memory keyBz) internal returns (uint nonces, uint balance) {
+	function loadWallet(bytes memory keyBz) internal virtual returns (uint nonces, uint balance) {
         	(bool success, bytes memory data) = SEP101Contract.delegatecall(
         		abi.encodeWithSignature("get(bytes)", keyBz));
 
@@ -179,17 +179,22 @@ contract StochasticPay_VRF {
 
 	function getRand32_sr(uint256 payerSalt_pk0_v, uint256 pkTail, bytes calldata pi) private returns (uint) {
 		(uint alpha, uint8 pk0) = (payerSalt_pk0_v>>16, uint8(payerSalt_pk0_v>>8));
-		(bool ok, bytes memory beta) = address(VRF_PRECOMPILE).call(abi.encodePacked(alpha, pk0, pkTail, pi));
-		require(ok, "VRF_FAIL");
+		bytes memory beta = verifyVRF(alpha, pk0, pkTail, pi);
 		return (uint(uint8(beta[3]))<<24) | (uint(uint8(beta[2]))<<16) |
 			 (uint(uint8(beta[1]))<<8) | (uint(uint8(beta[0])));
 	}
 
 	function getRand32_ab(uint256 alpha, uint8 pk0, uint256 pkTail, bytes calldata pi) private returns (uint) {
-		(bool ok, bytes memory beta) = address(VRF_PRECOMPILE).call(abi.encodePacked(alpha, pk0, pkTail, pi));
-		require(ok, "VRF_FAIL");
+		bytes memory beta = verifyVRF(alpha, pk0, pkTail, pi);
 		return (uint(uint8(beta[3]))<<24) | (uint(uint8(beta[2]))<<16) |
 			 (uint(uint8(beta[1]))<<8) | (uint(uint8(beta[0])));
+	}
+
+	function verifyVRF(uint256 alpha, uint8 pk, uint256 pkTail, bytes calldata pi) internal virtual view returns (bytes memory) {
+		(bool ok, bytes memory beta) = address(VRF_PRECOMPILE).staticcall(abi.encodePacked(alpha, pk, pkTail, pi));
+		require(ok, "VRF_FAIL");
+		// return abi.decode(beta, (uint));
+		return beta;
 	}
 
 	struct Params_sr {
@@ -323,3 +328,24 @@ contract StochasticPay_VRF {
 	}
 }
 
+contract StochasticPay_VRF_forUT is StochasticPay_VRF {
+
+	mapping(bytes => bytes) wallets;
+
+	function saveWallet(bytes memory keyBz, uint nonces, uint balance) internal override {
+		bytes memory valueBz = abi.encode(nonces, balance);
+		wallets[keyBz] = valueBz;
+	}
+
+	function loadWallet(bytes memory keyBz) internal override view returns (uint nonces, uint balance) {
+		bytes memory valueBz = wallets[keyBz];
+		return abi.decode(valueBz, (uint, uint));
+	}
+
+	function verifyVRF(uint256 alpha, uint8 pk, uint256 pkTail, bytes calldata pi) internal override view returns (bytes memory) {
+		// TODO
+		return "1234567890";
+	}
+
+
+}
