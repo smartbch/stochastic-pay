@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.9;
+pragma solidity ^0.8.9;
 
 import "./IERC20.sol";
 
@@ -43,14 +43,14 @@ contract StochasticPay_VRF {
 		require(success && ret, "trans-fail");
 	}
 
-	function saveWallet(bytes memory keyBz, uint nonces, uint balance) internal {
+	function saveWallet(bytes memory keyBz, uint nonces, uint balance) virtual internal {
 		bytes memory valueBz = abi.encode(nonces, balance);
 		(bool success, /*bytes memory _notUsed*/) = SEP101Contract.delegatecall(
 			abi.encodeWithSignature("set(bytes,bytes)", keyBz, valueBz));
 		require(success, "SEP101_SET_FAIL");
 	}
 
-	function loadWallet(bytes memory keyBz) internal returns (uint nonces, uint balance) {
+	function loadWallet(bytes memory keyBz) virtual internal returns (uint nonces, uint balance) {
         	(bool success, bytes memory data) = SEP101Contract.delegatecall(
         		abi.encodeWithSignature("get(bytes)", keyBz));
 
@@ -177,7 +177,7 @@ contract StochasticPay_VRF {
 		return ecrecover(eip712Hash, v, r, s);
 	}
 
-	function getRand32_sr(uint256 payerSalt_pk0_v, uint256 pkTail, bytes calldata pi) private returns (uint) {
+	function getRand32_sr(uint256 payerSalt_pk0_v, uint256 pkTail, bytes calldata pi) virtual internal returns (uint) {
 		(uint alpha, uint8 pk0) = (payerSalt_pk0_v>>16, uint8(payerSalt_pk0_v>>8));
 		(bool ok, bytes memory beta) = address(VRF_PRECOMPILE).call(abi.encodePacked(alpha, pk0, pkTail, pi));
 		require(ok, "VRF_FAIL");
@@ -210,7 +210,7 @@ contract StochasticPay_VRF {
 		require(block.timestamp < dueTime64, "EXPIRED");
 		uint rand32 = getRand32_sr(params.payerSalt_pk0_v, params.pkTail, pi);
 		uint prob32 = uint(uint32(params.payeeAddr_dueTime64_prob32));
-		require(rand32 < prob32, "CONNOT_PAY");
+		require(rand32 < prob32, "CANNOT_PAY");
 		address payerAddr = getPayer_sr(params.payerSalt_pk0_v,
 					        params.pkTail,
 					        params.payeeAddr_dueTime64_prob32,
@@ -246,23 +246,25 @@ contract StochasticPay_VRF {
 	}
 
 	function checkAndUpdateNonces(uint currNonces, uint seenNonces, uint salt) pure public returns (uint, bool) {
-		uint allMasks = 0;
-		uint pick = (7<<5);
-		bool anyMatch = false;
-		for(uint i=0; i<8; i++) {
-			uint shift = (salt&pick);
-			salt = salt >> 8;
-			uint mask = (0xFFFFFFFF << shift);
-			if((currNonces&mask) == (seenNonces&mask)) {
-				anyMatch = true;
+		unchecked {
+			uint allMasks = 0;
+			uint pick = (7<<5);
+			bool anyMatch = false;
+			for(uint i=0; i<8; i++) {
+				uint shift = (salt&pick);
+				salt = salt >> 8;
+				uint mask = (0xFFFFFFFF << shift);
+				if((currNonces&mask) == (seenNonces&mask)) {
+					anyMatch = true;
+				}
+				allMasks = allMasks | mask;
 			}
-			allMasks = allMasks | mask;
+			if(!anyMatch) {
+				return (0, false);
+			}
+			uint newNonces = currNonces - allMasks;
+			return ((newNonces&allMasks)|(currNonces&~allMasks), true);
 		}
-		if(!anyMatch) {
-			return (0, false);
-		}
-		uint newNonces = currNonces - allMasks;
-		return ((newNonces&allMasks)|(currNonces&~allMasks), true);
 	}
 
 	struct Params {
@@ -286,7 +288,7 @@ contract StochasticPay_VRF {
 			require(block.timestamp < dueTime64, "EXPIRED");
 			uint rand32 = getRand32_ab(params.payerSalt, uint8(params.index_pk0_v>>8), params.pkTail, pi);
 			uint prob32 = uint(uint32(tmp));
-			require(rand32 < prob32, "CONNOT_PAY");
+			require(rand32 < prob32, "CANNOT_PAY");
 		}
 		tmp = params.index_pk0_v;
 		bytes32 leaf = keccak256(abi.encodePacked(uint8(tmp>>8), params.pkTail));
