@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 import "./IERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract StochasticPay_VRF {
 	address constant private SEP206Contract = address(uint160(0x2711));
@@ -185,7 +186,7 @@ contract StochasticPay_VRF {
 			 (uint(uint8(beta[1]))<<8) | (uint(uint8(beta[0])));
 	}
 
-	function getRand32_ab(uint256 alpha, uint8 pk0, uint256 pkTail, bytes calldata pi) private returns (uint) {
+	function getRand32_ab(uint256 alpha, uint8 pk0, uint256 pkTail, bytes calldata pi) virtual internal returns (uint) {
 		(bool ok, bytes memory beta) = address(VRF_PRECOMPILE).call(abi.encodePacked(alpha, pk0, pkTail, pi));
 		require(ok, "VRF_FAIL");
 		return (uint(uint8(beta[3]))<<24) | (uint(uint8(beta[2]))<<16) |
@@ -231,20 +232,6 @@ contract StochasticPay_VRF {
 		saveWallet(keyBz, nonces, balance + amount);
 	}
 
-	function verifyMerkle(bytes32[] memory proof, bytes32 root, bytes32 leaf, uint index) public pure returns (bool) {
-		bytes32 hash = leaf;
-		for (uint i = 0; i < proof.length; i++) {
-			bytes32 proofElement = proof[i];
-			if (index % 2 == 0) {
-				hash = keccak256(abi.encodePacked(hash, proofElement));
-			} else {
-				hash = keccak256(abi.encodePacked(proofElement, hash));
-			}
-			index = index / 2;
-		}
-		return hash == root;
-	}
-
 	function checkAndUpdateNonces(uint currNonces, uint seenNonces, uint salt) pure public returns (uint, bool) {
 		unchecked {
 			uint allMasks = 0;
@@ -271,7 +258,7 @@ contract StochasticPay_VRF {
 		uint256 payerSalt;
 		uint256 pkTail;
 		bytes32 pkHashRoot;
-		uint256 index_pk0_v;
+		uint256 pk0_v;
 		uint256 sep20Contract_dueTime64_prob32;
 		uint256 seenNonces;
 		uint256 payeeAddrA_amountA;
@@ -286,13 +273,14 @@ contract StochasticPay_VRF {
 		{
 			uint64 dueTime64 = uint64(tmp>>32);
 			require(block.timestamp < dueTime64, "EXPIRED");
-			uint rand32 = getRand32_ab(params.payerSalt, uint8(params.index_pk0_v>>8), params.pkTail, pi);
+			uint rand32 = getRand32_ab(params.payerSalt, uint8(params.pk0_v>>8), params.pkTail, pi);
 			uint prob32 = uint(uint32(tmp));
 			require(rand32 < prob32, "CANNOT_PAY");
 		}
-		tmp = params.index_pk0_v;
-		bytes32 leaf = keccak256(abi.encodePacked(uint8(tmp>>8), params.pkTail));
-		require(verifyMerkle(proof, params.pkHashRoot, leaf, tmp>>16), "VERIFY_FAILED");
+		tmp = params.pk0_v;
+		bytes32 root = params.pkHashRoot;
+		bytes32 leaf = bytes32(abi.encodePacked(uint8(tmp>>8), params.pkTail<<8));
+		require(MerkleProof.verifyCalldata(proof, params.pkHashRoot, leaf), "VERIFY_FAILED");
 
 		address payerAddr = getPayer_ab(params.payerSalt,
 					        params.pkHashRoot,

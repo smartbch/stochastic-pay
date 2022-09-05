@@ -31,6 +31,10 @@ contract StochasticPay_VRF_forUT is StochasticPay_VRF {
         return 0; // return 0 and make sure the rand32 is lower than prob32
     }
 
+    function getRand32_ab(uint256 alpha, uint8 pk0, uint256 pkTail, bytes calldata pi) override internal pure returns (uint) {
+        return 0; // return 0 and make sure the rand32 is lower than prob32
+    }
+
     function getBalance(address owner, address sep20Contract) public view returns (uint) {
         bytes memory keyBz = abi.encode(sep20Contract, owner);
         (uint nonces, uint balance) = loadWallet(keyBz);
