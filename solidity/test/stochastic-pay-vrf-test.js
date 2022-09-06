@@ -289,6 +289,91 @@ describe("StochasticPay_VRF", function () {
     expect(payeeABalance).to.equal(50);
     expect(payeeBBalance).to.equal(50);
   });
+
+  it("payToAB:EXPIRED", async function () {
+    const dueTime64 = Math.floor(Date.now() / 1000) - 3600;
+    const prob32 = 0xFFFFFFFF;
+    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+
+    const msg = {
+      payerSalt: payerSalt,
+      pkHashRoot: validatorPkHashRoot,
+      sep20Contract_dueTime64_prob32: concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
+      seenNonces: seenNonces,
+      payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
+      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+    }
+
+    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
+    console.log("PayerPubKeyHash: ", payerPubKeyHash);
+    const proofHex = merkleTree.getHexProof(payerPubKeyHash);
+    console.log("proof: ", proofHex);
+    const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
+    await expect(payToAB(stochasticPayVrf, msg, proofHex, payerPubKeyHash, r, s, v)).to.be.revertedWith("EXPIRED");
+  });
+
+  it("payToAB:CANNOT_PAY", async function () {
+    const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
+    const prob32 = 0x00000000;
+    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+
+    const msg = {
+      payerSalt: payerSalt,
+      pkHashRoot: validatorPkHashRoot,
+      sep20Contract_dueTime64_prob32: concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
+      seenNonces: seenNonces,
+      payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
+      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+    }
+
+    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
+    console.log("PayerPubKeyHash: ", payerPubKeyHash);
+    const proofHex = merkleTree.getHexProof(payerPubKeyHash);
+    console.log("proof: ", proofHex);
+    const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
+    await expect(payToAB(stochasticPayVrf, msg, proofHex, payerPubKeyHash, r, s, v)).to.be.revertedWith("CANNOT_PAY");
+  });
+
+  it("payToAB:VERIFY_FAILED", async function () {
+    const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
+    const prob32 = 0xFFFFFFFF;
+    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+
+    const msg = {
+      payerSalt: payerSalt,
+      pkHashRoot: validatorPkHashRoot,
+      sep20Contract_dueTime64_prob32: concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
+      seenNonces: seenNonces,
+      payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
+      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+    }
+
+    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
+    const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
+    await expect(payToAB(stochasticPayVrf, msg, [], payerPubKeyHash, r, s, v)).to.be.revertedWith("VERIFY_FAILED");
+  });
+
+  it("payToAB:INCORRECT_NONCES", async function () {
+    const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
+    const prob32 = 0xFFFFFFFF;
+    const seenNonces = 0x1111111111111111111111111111111111111111111111111111111111111111n  // 256 bits
+
+    const msg = {
+      payerSalt: payerSalt,
+      pkHashRoot: validatorPkHashRoot,
+      sep20Contract_dueTime64_prob32: concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
+      seenNonces: seenNonces,
+      payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
+      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+    }
+
+    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
+    console.log("PayerPubKeyHash: ", payerPubKeyHash);
+    const proofHex = merkleTree.getHexProof(payerPubKeyHash);
+    console.log("proof: ", proofHex);
+    const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
+    await expect(payToAB(stochasticPayVrf, msg, proofHex, payerPubKeyHash, r, s, v)).to.be.revertedWith("INCORRECT_NONCES");
+  });
 });
 
 function getEIP712HashSrSol(stochasticPayVrf, msg) {
