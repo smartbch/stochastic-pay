@@ -18,7 +18,7 @@ contract StochasticPay_VRF_forUT is StochasticPay_VRF {
         wallets[keyBz].val = valueBz;
     }
 
-    function loadWallet(bytes memory keyBz) override internal view returns (uint nonces, uint balance) {
+    function loadWallet(bytes memory keyBz) override public view returns (uint nonces, uint balance) {
         if(!wallets[keyBz].isExist) {
             return (0, 0);
         }

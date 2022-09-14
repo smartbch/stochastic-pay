@@ -51,7 +51,7 @@ contract StochasticPay_VRF {
 		require(success, "SEP101_SET_FAIL");
 	}
 
-	function loadWallet(bytes memory keyBz) virtual internal returns (uint nonces, uint balance) {
+	function loadWallet(bytes memory keyBz) virtual public returns (uint nonces, uint balance) {
         	(bool success, bytes memory data) = SEP101Contract.delegatecall(
         		abi.encodeWithSignature("get(bytes)", keyBz));
 
