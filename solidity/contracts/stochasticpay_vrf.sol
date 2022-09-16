@@ -20,6 +20,16 @@ contract StochasticPay_VRF {
 	// usually A is an EOA and B is a contract whose beneficiary own the vrf-pubkeys
 	bytes32 private constant TYPE_HASH_AB = keccak256(abi.encodePacked("Pay(uint256 payerSalt,bytes32 pkHashRoot,uint256 sep20Contract_dueTime64_prob32,uint256 seenNonces,uint256 payeeAddrA_amountA,uint256 payeeAddrB_amountB)"));
 
+	mapping(address => bytes32) private vrfPubKeyMap; // address => vrfPubKey
+
+	function getVrfPubKeyByAddr(address addr) public view returns (bytes32) {
+		return vrfPubKeyMap[addr];
+	}
+
+	function registerVrfPubKey(bytes32 vrfPubKey) external {
+		vrfPubKeyMap[address(msg.sender)] = vrfPubKey;
+	}
+
 	function safeReceive(address coinType, uint amount) internal returns (uint96) {
 		uint realAmount = amount;
 		if(coinType == SEP206Contract) {

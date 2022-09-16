@@ -374,6 +374,26 @@ describe("StochasticPay_VRF", function () {
     const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
     await expect(payToAB(stochasticPayVrf, msg, proofHex, payerPubKeyHash, r, s, v)).to.be.revertedWith("INCORRECT_NONCES");
   });
+
+  // ----------------------------------------------------------------
+
+  it("registerVrfPubKey: OK", async function () {
+    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
+    console.log("PayerPubKeyHash: ", payerPubKeyHash);
+
+    await stochasticPayVrf.connect(payer).registerVrfPubKey(payerPubKeyHash);
+    const pubKey = await stochasticPayVrf.getVrfPubKeyByAddr(payer.address);
+    expect(payerPubKeyHash).to.equal(pubKey)
+  });
+
+  it("registerVrfPubKey: WRONG ADDR", async function () {
+    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
+    console.log("PayerPubKeyHash: ", payerPubKeyHash);
+
+    const pubKey = await stochasticPayVrf.getVrfPubKeyByAddr(deployer.address);
+    expect(pubKey).to.equal("0x0000000000000000000000000000000000000000000000000000000000000000")
+  });
+
 });
 
 function getEIP712HashSrSol(stochasticPayVrf, msg) {
