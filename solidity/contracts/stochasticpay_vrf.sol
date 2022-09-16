@@ -28,6 +28,13 @@ contract StochasticPay_VRF {
 		require(success, "SEP101_SET_FAIL");
 	}
 
+	function unregisterVrfPubKey() virtual external {
+		bytes memory keyBz = abi.encodePacked(msg.sender);
+		(bool success, /*bytes memory _notUsed*/) = SEP101Contract.delegatecall(
+			abi.encodeWithSignature("set(bytes,bytes)", keyBz, bytes32(0)));
+		require(success, "SEP101_SET_FAIL");
+	}
+
 	function getVrfPubKeyByAddr(address addr) virtual public returns (bytes memory)  {
 		bytes memory keyBz = abi.encodePacked(addr);
 		(bool success, bytes memory data) = SEP101Contract.delegatecall(
@@ -203,6 +210,22 @@ contract StochasticPay_VRF {
 			 (uint(uint8(beta[1]))<<8) | (uint(uint8(beta[0])));
 	}
 
+	function getRandProb_sr(uint256 payerSalt_pk0_v, uint256 pkTail, bytes calldata pi, uint prob32) virtual internal returns (uint) {
+		(uint alpha, uint8 pk0) = (payerSalt_pk0_v>>16, uint8(payerSalt_pk0_v>>8));
+		(bool ok, bytes memory beta) = address(VRF_PRECOMPILE).call(abi.encodePacked(alpha, pk0, pkTail, pi));
+		require(ok, "VRF_FAIL");
+		uint rand256 = abi.decode(beta, (uint));
+		uint mask = (1<<32)-1;
+		uint randProb = 0;
+		for(uint i = 0; i < 256; i += 32) {
+			uint rand32 = (rand256>>i)&mask;
+			if(rand32 < prob32) {
+				randProb += rand32 & 0xFF;
+			}
+		}
+		return randProb;
+	}
+
 	function getRand32_ab(uint256 alpha, uint8 pk0, uint256 pkTail, bytes calldata pi) virtual internal returns (uint) {
 		(bool ok, bytes memory beta) = address(VRF_PRECOMPILE).call(abi.encodePacked(alpha, pk0, pkTail, pi));
 		require(ok, "VRF_FAIL");
@@ -226,9 +249,15 @@ contract StochasticPay_VRF {
 	function payToSingleReciever(bytes calldata pi, Params_sr calldata params) external {
 		uint64 dueTime64 = uint64(params.payeeAddr_dueTime64_prob32>>32);
 		require(block.timestamp < dueTime64, "EXPIRED");
-		uint rand32 = getRand32_sr(params.payerSalt_pk0_v, params.pkTail, pi);
 		uint prob32 = uint(uint32(params.payeeAddr_dueTime64_prob32));
-		require(rand32 < prob32, "CANNOT_PAY");
+		uint randProb = 0;
+		if(params.payerSalt_pk0_v>>255 != 0) { // the highest bit is set
+			uint rand32 = getRand32_sr(params.payerSalt_pk0_v, params.pkTail, pi);
+			require(rand32 < prob32, "CONNOT_PAY");
+		} else {
+			randProb = getRandProb_sr(params.payerSalt_pk0_v, params.pkTail, pi, prob32);
+			require(randProb != 0, "CONNOT_PAY");
+		}
 		address payerAddr = getPayer_sr(params.payerSalt_pk0_v,
 					        params.pkTail,
 					        params.payeeAddr_dueTime64_prob32,
@@ -243,6 +272,9 @@ contract StochasticPay_VRF {
 		require(pass, "INCORRECT_NONCES");
 		address payeeAddr = address(bytes20(uint160(params.payeeAddr_dueTime64_prob32>>96)));
 		uint amount = uint(uint96(params.sep20Contract_amount));
+		if(randProb != 0) {
+			amount = amount * randProb / (8*256);
+		}
 		saveWallet(keyBz, nonces, balance - amount);
 		keyBz = abi.encode(sep20Contract, payeeAddr);
 		(nonces, balance) = loadWallet(keyBz);
