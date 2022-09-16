@@ -378,20 +378,17 @@ describe("StochasticPay_VRF", function () {
   // ----------------------------------------------------------------
 
   it("registerVrfPubKey: OK", async function () {
-    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
-    console.log("PayerPubKeyHash: ", payerPubKeyHash);
-
-    await stochasticPayVrf.connect(payer).registerVrfPubKey(payerPubKeyHash);
+    const vrfPubKey ="0x0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+    await stochasticPayVrf.connect(payer).registerVrfPubKey(vrfPubKey);
     const pubKey = await stochasticPayVrf.getVrfPubKeyByAddr(payer.address);
-    expect(payerPubKeyHash).to.equal(pubKey)
+    console.log("pubKey: ", pubKey);
+    expect(vrfPubKey).to.equal(pubKey);
   });
 
   it("registerVrfPubKey: WRONG ADDR", async function () {
-    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
-    console.log("PayerPubKeyHash: ", payerPubKeyHash);
-
     const pubKey = await stochasticPayVrf.getVrfPubKeyByAddr(deployer.address);
-    expect(pubKey).to.equal("0x0000000000000000000000000000000000000000000000000000000000000000")
+    console.log("pubKey: ", pubKey);
+    expect(pubKey.length === 2).to.be.ok; // empty bytes "0x"
   });
 
 });

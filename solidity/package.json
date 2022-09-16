@@ -8,7 +8,7 @@
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.5.1",
     "ethers-eip712": "^0.2.0",
-    "hardhat": "^2.6.8"
+    "hardhat": "^2.11.1"
   },
   "dependencies": {
     "keccak256": "^1.0.6",

@@ -20,15 +20,22 @@ contract StochasticPay_VRF {
 	// usually A is an EOA and B is a contract whose beneficiary own the vrf-pubkeys
 	bytes32 private constant TYPE_HASH_AB = keccak256(abi.encodePacked("Pay(uint256 payerSalt,bytes32 pkHashRoot,uint256 sep20Contract_dueTime64_prob32,uint256 seenNonces,uint256 payeeAddrA_amountA,uint256 payeeAddrB_amountB)"));
 
-	mapping(address => bytes32) private vrfPubKeyMap; // address => vrfPubKey
-
-	function getVrfPubKeyByAddr(address addr) public view returns (bytes32) {
-		return vrfPubKeyMap[addr];
+	function registerVrfPubKey(bytes memory vrfPubKey) virtual external {
+		require(vrfPubKey.length == 33, "INCORRECT_VRF_PK_LENGTH");
+		bytes memory keyBz = abi.encodePacked(msg.sender);
+		(bool success, /*bytes memory _notUsed*/) = SEP101Contract.delegatecall(
+			abi.encodeWithSignature("set(bytes,bytes)", keyBz, vrfPubKey));
+		require(success, "SEP101_SET_FAIL");
 	}
 
-	function registerVrfPubKey(bytes32 vrfPubKey) external {
-		vrfPubKeyMap[address(msg.sender)] = vrfPubKey;
+	function getVrfPubKeyByAddr(address addr) virtual public returns (bytes memory)  {
+		bytes memory keyBz = abi.encodePacked(addr);
+		(bool success, bytes memory data) = SEP101Contract.delegatecall(
+			abi.encodeWithSignature("get(bytes)", keyBz));
+		require(success, "SEP101_GET_FAIL");
+		return data;
 	}
+
 
 	function safeReceive(address coinType, uint amount) internal returns (uint96) {
 		uint realAmount = amount;
@@ -62,13 +69,13 @@ contract StochasticPay_VRF {
 	}
 
 	function loadWallet(bytes memory keyBz) virtual public returns (uint nonces, uint balance) {
-        	(bool success, bytes memory data) = SEP101Contract.delegatecall(
-        		abi.encodeWithSignature("get(bytes)", keyBz));
+		(bool success, bytes memory data) = SEP101Contract.delegatecall(
+			abi.encodeWithSignature("get(bytes)", keyBz));
 
-        	require(success && (data.length == 32 * 2 || data.length == 32 * 4));
-        	if (data.length == 32 * 2) {
-        		return (0, 0);
-        	}
+		require(success && (data.length == 32 * 2 || data.length == 32 * 4));
+		if (data.length == 32 * 2) {
+			return (0, 0);
+		}
 
 		bytes memory valueBz;
 		assembly {valueBz := add(data, 64)}

@@ -5,12 +5,18 @@ import "./stochasticpay_vrf.sol";
 
 contract StochasticPay_VRF_forUT is StochasticPay_VRF {
 
-    struct data {
+    struct walletData {
         bytes val;
         bool isExist;
     }
 
-    mapping(bytes => data) wallets;
+    mapping(bytes => walletData) wallets;
+
+    struct vrfPubKeyData {
+        bytes val;
+        bool isExist;
+    }
+    mapping(bytes => vrfPubKeyData) vrfPubKeyMap;
 
     function saveWallet(bytes memory keyBz, uint nonces, uint balance) override internal {
         bytes memory valueBz = abi.encode(nonces, balance);
@@ -39,5 +45,20 @@ contract StochasticPay_VRF_forUT is StochasticPay_VRF {
         bytes memory keyBz = abi.encode(sep20Contract, owner);
         (uint nonces, uint balance) = loadWallet(keyBz);
         return balance;
+    }
+
+    function registerVrfPubKey(bytes memory vrfPubKey) override external {
+        require(vrfPubKey.length == 33, "INCORRECT_VRF_PK_LENGTH");
+        bytes memory keyBz = abi.encodePacked(msg.sender);
+        vrfPubKeyMap[keyBz].isExist = true;
+        vrfPubKeyMap[keyBz].val = vrfPubKey;
+    }
+
+    function getVrfPubKeyByAddr(address addr) override public view returns (bytes memory)  {
+        bytes memory keyBz = abi.encodePacked(addr);
+        if(!vrfPubKeyMap[keyBz].isExist) {
+            return "";
+        }
+        return vrfPubKeyMap[keyBz].val;
     }
 }
