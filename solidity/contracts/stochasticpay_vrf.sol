@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+import "hardhat/console.sol";
 import "./IERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
@@ -253,10 +254,10 @@ contract StochasticPay_VRF {
 		uint randProb = 0;
 		if(params.payerSalt_pk0_v>>255 != 0) { // the highest bit is set
 			uint rand32 = getRand32_sr(params.payerSalt_pk0_v, params.pkTail, pi);
-			require(rand32 < prob32, "CONNOT_PAY");
+			require(rand32 < prob32, "CANNOT_PAY");
 		} else {
 			randProb = getRandProb_sr(params.payerSalt_pk0_v, params.pkTail, pi, prob32);
-			require(randProb != 0, "CONNOT_PAY");
+			require(randProb != 0, "CANNOT_PAY");
 		}
 		address payerAddr = getPayer_sr(params.payerSalt_pk0_v,
 					        params.pkTail,

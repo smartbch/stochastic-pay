@@ -391,6 +391,15 @@ describe("StochasticPay_VRF", function () {
     expect(pubKey.length === 2).to.be.ok; // empty bytes "0x"
   });
 
+  it("unregisterVrfPubKey: OK", async function () {
+    const vrfPubKey ="0x0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+    await stochasticPayVrf.connect(payer).registerVrfPubKey(vrfPubKey);
+    await stochasticPayVrf.connect(payer).unregisterVrfPubKey();
+    const pubKey = await stochasticPayVrf.getVrfPubKeyByAddr(payer.address);
+    console.log("pubKey: ", pubKey);
+    expect(pubKey.length === 2).to.be.ok; // empty bytes "0x"
+  });
+
 });
 
 function getEIP712HashSrSol(stochasticPayVrf, msg) {

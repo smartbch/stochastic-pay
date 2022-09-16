@@ -41,6 +41,10 @@ contract StochasticPay_VRF_forUT is StochasticPay_VRF {
         return 0; // return 0 and make sure the rand32 is lower than prob32
     }
 
+    function getRandProb_sr(uint256 payerSalt_pk0_v, uint256 pkTail, bytes calldata pi, uint prob32) override internal returns (uint) {
+        return 0;
+    }
+
     function getBalance(address owner, address sep20Contract) public view returns (uint) {
         bytes memory keyBz = abi.encode(sep20Contract, owner);
         (uint nonces, uint balance) = loadWallet(keyBz);
@@ -60,5 +64,13 @@ contract StochasticPay_VRF_forUT is StochasticPay_VRF {
             return "";
         }
         return vrfPubKeyMap[keyBz].val;
+    }
+
+    function unregisterVrfPubKey() override external {
+        bytes memory keyBz = abi.encodePacked(msg.sender);
+        if(!vrfPubKeyMap[keyBz].isExist) {
+            return;
+        }
+        vrfPubKeyMap[keyBz].isExist = false;
     }
 }
