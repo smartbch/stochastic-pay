@@ -78,6 +78,12 @@ describe("StochasticPay_VRF", function () {
   });
 
 
+  it("loadWallet: OK", async function () {
+    const [nonces, balance] = await stochasticPayVrf.loadWallet(concatContractAddrAndOwnerAddr(myToken.address, payer.address));
+    console.log("Nonces: " + nonces, "Balance: " + balance)
+    expect(balance).to.equal(payerAllowance);
+  });
+
   it("getEIP712Hash_sr", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0x12345678;
@@ -401,6 +407,11 @@ describe("StochasticPay_VRF", function () {
   });
 
 });
+
+function concatContractAddrAndOwnerAddr(contract, owner) {
+  return ethers.utils.defaultAbiCoder.encode([ "address", "address" ], [contract, owner]);
+}
+
 
 function getEIP712HashSrSol(stochasticPayVrf, msg) {
   return stochasticPayVrf.getEIP712Hash_sr(
