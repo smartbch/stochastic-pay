@@ -7,7 +7,7 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const [deployer] = await ethers.getSigners();
+    const [deployer, delegatedAccount] = await ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);
 
     const abi = [
@@ -21,21 +21,21 @@ async function main() {
     ]
 
     const provider = ethers.getDefaultProvider("http://192.168.64.4:8545");
-    const stochasticPayVrfAddr = "0x92dEa0f49E533F119d95354b22faE86eafd0dB47";
+    const stochasticPayVrfAddr = "0x6C0370C33606a41E25f57483d125Ce33023f10e1";
     const stochasticPayVrf = new ethers.Contract(stochasticPayVrfAddr, abi, provider).connect(deployer);
 
-    const myTokenAddress = "0x09b23F6c5e254603C57b1e12B1AdB8EaCd837216";
+    const myTokenAddress = "0xbBd4d8AdFfC59E964E27D7E898F99Cfff956C957";
     const myToken = new ethers.Contract(myTokenAddress, tokenABI, provider).connect(deployer);
 
     // 1. approve allowance
-    const payerAllowance = 101;
+    const payerAllowance = 10000;
     await myToken.connect(deployer).approve(stochasticPayVrf.address, payerAllowance, {gasPrice: 10000000000});
 
     // 2. deposit
-    await stochasticPayVrf.deposit(deployer.address, concatAddressAmount(myToken.address, payerAllowance), {gasPrice: 10000000000});
+    await stochasticPayVrf.deposit(delegatedAccount.address, concatAddressAmount(myToken.address, 100), {gasPrice: 10000000000});
 
     // 3. load wallet
-    const keyBz = concatContractAddrAndOwnerAddr(myTokenAddress, deployer.address);
+    const keyBz = concatContractAddrAndOwnerAddr(myTokenAddress, delegatedAccount.address);
     console.log(keyBz);
     const [nonces, balance] = await stochasticPayVrf.loadWallet(keyBz);
     console.log("Nonces: " + nonces, "Balance: " + balance)
