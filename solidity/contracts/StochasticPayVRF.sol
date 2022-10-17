@@ -287,7 +287,8 @@ contract StochasticPay_VRF {
 			uint allMasks = 0;
 			uint pick = (7<<5);
 			bool anyMatch = false;
-			for(uint i=0; i<8; i++) {
+			uint newNonces = 0;
+			for(uint i=0; i<3; i++) {
 				uint shift = (salt&pick);
 				salt = salt >> 8;
 				uint mask = (0xFFFFFFFF << shift);
@@ -295,11 +296,11 @@ contract StochasticPay_VRF {
 					anyMatch = true;
 				}
 				allMasks = allMasks | mask;
+				newNonces = newNonces | (((currNonces&mask) - mask)&mask);
 			}
 			if(!anyMatch) {
 				return (0, false);
 			}
-			uint newNonces = currNonces - allMasks;
 			return ((newNonces&allMasks)|(currNonces&~allMasks), true);
 		}
 	}

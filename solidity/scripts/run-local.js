@@ -21,10 +21,10 @@ async function main() {
     ]
 
     const provider = ethers.getDefaultProvider("http://192.168.64.4:8545");
-    const stochasticPayVrfAddr = "0x6C0370C33606a41E25f57483d125Ce33023f10e1";
+    const stochasticPayVrfAddr = "0x1C5a5C4ADC9b8a41c35299Dc302026e5f2F770a6";
     const stochasticPayVrf = new ethers.Contract(stochasticPayVrfAddr, abi, provider).connect(deployer);
 
-    const myTokenAddress = "0xbBd4d8AdFfC59E964E27D7E898F99Cfff956C957";
+    const myTokenAddress = "0x01ce7e2a5e332594F9e87e3Ebd5D16fD7B5d7F0b";
     const myToken = new ethers.Contract(myTokenAddress, tokenABI, provider).connect(deployer);
 
     // 1. approve allowance
@@ -34,11 +34,19 @@ async function main() {
     // 2. deposit
     await stochasticPayVrf.deposit(delegatedAccount.address, concatAddressAmount(myToken.address, 100), {gasPrice: 10000000000});
 
-    // 3. load wallet
-    const keyBz = concatContractAddrAndOwnerAddr(myTokenAddress, delegatedAccount.address);
-    console.log(keyBz);
-    const [nonces, balance] = await stochasticPayVrf.loadWallet(keyBz);
-    console.log("Nonces: " + nonces, "Balance: " + balance)
+    // 3. load payer wallet
+    const payerBz = concatContractAddrAndOwnerAddr(myTokenAddress, delegatedAccount.address);
+    console.log(payerBz);
+    let [nonces, balance] = await stochasticPayVrf.loadWallet(payerBz);
+    let noncesBz = ethers.utils.hexZeroPad(nonces.toHexString(), 32)
+    console.log("Nonces: " + noncesBz, "Balance: " + balance)
+
+    // 4. load payee wallet
+    const payeeBz = concatContractAddrAndOwnerAddr(myTokenAddress, "0xE0F007dab8543052dfc4C23Cf8a3aDb848A875f9");
+    console.log(payeeBz);
+    [nonces, balance] = await stochasticPayVrf.loadWallet(payeeBz);
+    noncesBz = ethers.utils.hexZeroPad(nonces.toHexString(), 32)
+    console.log("Nonces: " + noncesBz, "Balance: " + balance)
 }
 
 

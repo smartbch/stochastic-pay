@@ -12,7 +12,8 @@ async function main() {
   const balance = await deployer.getBalance()
   console.log("Account balance: ", ethers.utils.formatEther(balance));
 
-  const StochasticPayVrf = await ethers.getContractFactory("StochasticPay_VRF");
+  // const StochasticPayVrf = await ethers.getContractFactory("StochasticPay_VRF");
+  const StochasticPayVrf = await ethers.getContractFactory("StochasticPay_VRF_forUT");
   const stochasticPayVrf = await StochasticPayVrf.deploy({gasPrice: 10000000000});
   await stochasticPayVrf.deployed();
   console.log("StochasticPayVrf deployed to:", stochasticPayVrf.address);
