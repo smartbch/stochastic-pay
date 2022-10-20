@@ -4,7 +4,7 @@ const { TypedDataUtils } = require('ethers-eip712');
 const { MerkleTree } = require('merkletreejs');
 const keccak256 = require('keccak256');
 
-describe("StochasticPay_VRF", function () {
+describe("StochasticPay_VRF2", function () {
   const payerSalt = ethers.utils.id("payerSalt");
   const payeeASalt = ethers.utils.id("payeeASalt");
   const payeeBSalt = ethers.utils.id("payeeBSalt");
@@ -236,7 +236,7 @@ describe("StochasticPay_VRF", function () {
       sep20Contract_dueTime64_prob32:concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
       seenNonces: seenNonces,
       payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
-      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+      amountB: wrapAmount(50),
     }
 
     const eip712HashAbSol = await getEIP712HashAbSol(stochasticPayVrf, msg);
@@ -257,7 +257,7 @@ describe("StochasticPay_VRF", function () {
       sep20Contract_dueTime64_prob32:concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
       seenNonces: seenNonces,
       payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
-      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+      amountB: wrapAmount(50),
     }
 
     const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
@@ -276,20 +276,25 @@ describe("StochasticPay_VRF", function () {
       sep20Contract_dueTime64_prob32: concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
       seenNonces: seenNonces,
       payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
-      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+      amountB: wrapAmount(50),
     }
 
-    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
-    console.log("PayerPubKeyHash: ", payerPubKeyHash);
-    const proofHex = merkleTree.getHexProof(payerPubKeyHash);
+
+    const payeeBPubKeyHash = ethers.utils.keccak256(payeeB.publicKey);
+    console.log("payeeBPubKeyHash: ", payeeBPubKeyHash);
+    const proofHex = merkleTree.getHexProof(payeeBPubKeyHash);
     console.log("proof: ", proofHex);
     const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
-    await payToAB(stochasticPayVrf, msg, proofHex, payerPubKeyHash, r, s, v);
+    await payToAB(stochasticPayVrf, msg, proofHex, payeeB.publicKey, r, s, v);
 
     console.log("Pay AB done!");
     let payerBalance = await getBalance(stochasticPayVrf, payer.address, myToken.address);
     let payeeABalance = await getBalance(stochasticPayVrf, payeeA.address, myToken.address);
     let payeeBBalance = await getBalance(stochasticPayVrf, payeeB.address, myToken.address);
+
+    console.log(payerBalance)
+    console.log(payeeABalance)
+    console.log(payeeBBalance)
 
     expect(payerBalance).to.equal(1);
     expect(payeeABalance).to.equal(50);
@@ -307,15 +312,15 @@ describe("StochasticPay_VRF", function () {
       sep20Contract_dueTime64_prob32: concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
       seenNonces: seenNonces,
       payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
-      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+      amountB: wrapAmount(50),
     }
 
-    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
-    console.log("PayerPubKeyHash: ", payerPubKeyHash);
-    const proofHex = merkleTree.getHexProof(payerPubKeyHash);
+    const payeeBPubKeyHash = ethers.utils.keccak256(payeeB.publicKey);
+    console.log("payeeBPubKeyHash: ", payeeBPubKeyHash);
+    const proofHex = merkleTree.getHexProof(payeeBPubKeyHash);
     console.log("proof: ", proofHex);
     const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
-    await expect(payToAB(stochasticPayVrf, msg, proofHex, payerPubKeyHash, r, s, v)).to.be.revertedWith("EXPIRED");
+    await expect(payToAB(stochasticPayVrf, msg, proofHex, payeeB.publicKey, r, s, v)).to.be.revertedWith("EXPIRED");
   });
 
   it("payToAB:CANNOT_PAY", async function () {
@@ -329,15 +334,15 @@ describe("StochasticPay_VRF", function () {
       sep20Contract_dueTime64_prob32: concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
       seenNonces: seenNonces,
       payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
-      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+      amountB: wrapAmount(50),
     }
 
-    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
-    console.log("PayerPubKeyHash: ", payerPubKeyHash);
-    const proofHex = merkleTree.getHexProof(payerPubKeyHash);
+    const payeeBPubKeyHash = ethers.utils.keccak256(payeeB.publicKey);
+    console.log("payeeBPubKeyHash: ", payeeBPubKeyHash);
+    const proofHex = merkleTree.getHexProof(payeeBPubKeyHash);
     console.log("proof: ", proofHex);
     const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
-    await expect(payToAB(stochasticPayVrf, msg, proofHex, payerPubKeyHash, r, s, v)).to.be.revertedWith("CANNOT_PAY");
+    await expect(payToAB(stochasticPayVrf, msg, proofHex, payeeB.publicKey, r, s, v)).to.be.revertedWith("CANNOT_PAY");
   });
 
   it("payToAB:VERIFY_FAILED", async function () {
@@ -351,12 +356,11 @@ describe("StochasticPay_VRF", function () {
       sep20Contract_dueTime64_prob32: concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
       seenNonces: seenNonces,
       payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
-      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+      amountB: wrapAmount(50),
     }
 
-    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
     const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
-    await expect(payToAB(stochasticPayVrf, msg, [], payerPubKeyHash, r, s, v)).to.be.revertedWith("VERIFY_FAILED");
+    await expect(payToAB(stochasticPayVrf, msg, [], payer.publicKey, r, s, v)).to.be.revertedWith("VERIFY_FAILED");
   });
 
   it("payToAB:INCORRECT_NONCES", async function () {
@@ -370,15 +374,15 @@ describe("StochasticPay_VRF", function () {
       sep20Contract_dueTime64_prob32: concatAddrDueTime64Prob32(myToken.address, dueTime64, prob32),
       seenNonces: seenNonces,
       payeeAddrA_amountA: concatAddressAmount(payeeA.address, 50),
-      payeeAddrB_amountB: concatAddressAmount(payeeB.address, 50),
+      amountB: wrapAmount(50),
     }
 
-    const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey);
-    console.log("PayerPubKeyHash: ", payerPubKeyHash);
-    const proofHex = merkleTree.getHexProof(payerPubKeyHash);
+    const payeeBPubKeyHash = ethers.utils.keccak256(payeeB.publicKey);
+    console.log("payeeBPubKeyHash: ", payeeBPubKeyHash);
+    const proofHex = merkleTree.getHexProof(payeeBPubKeyHash);
     console.log("proof: ", proofHex);
     const [r, s, v] = signRawMsgAb(stochasticPayVrf.address, msg, payer);
-    await expect(payToAB(stochasticPayVrf, msg, proofHex, payerPubKeyHash, r, s, v)).to.be.revertedWith("INCORRECT_NONCES");
+    await expect(payToAB(stochasticPayVrf, msg, proofHex, payeeB.publicKey, r, s, v)).to.be.revertedWith("INCORRECT_NONCES");
   });
 
   // ----------------------------------------------------------------
@@ -430,7 +434,7 @@ function getEIP712HashAbSol(stochasticPayVrf, msg) {
       msg.sep20Contract_dueTime64_prob32,
       msg.seenNonces,
       msg.payeeAddrA_amountA,
-      msg.payeeAddrB_amountB,
+      msg.amountB,
   );
 }
 
@@ -452,7 +456,7 @@ function getPayerAb(stochasticPayVrf, msg, r, s, v) {
       msg.sep20Contract_dueTime64_prob32,
       msg.seenNonces,
       msg.payeeAddrA_amountA,
-      msg.payeeAddrB_amountB,
+      msg.amountB,
       v, r, s,
   );
 }
@@ -471,19 +475,20 @@ function payToSingleReciever(stochasticPayVrf, msg, payerSalt_pk0, pkTail, r, s,
   return stochasticPayVrf.payToSingleReciever(pi, params);
 }
 
-function payToAB(stochasticPayVrf, msg, proof, publicKey, r, s, v) {
+function payToAB(stochasticPayVrf, msg, proof, validatorPubKey, r, s, v) {
   pi = 0x00;
-  console.log("pk0", concatPk0V(publicKey, v))
-  console.log("pkTail:", getPkTail(publicKey))
+  const [pkX, pkY] = splitPKToXY(validatorPubKey);
+  console.log("pkX: ", pkX);
+  console.log("pkY: ", pkY);
   let params = {
     payerSalt: msg.payerSalt,
-    pkTail: getPkTail(publicKey),
+    pkX: pkX,
+    pkY: pkY,
     pkHashRoot: msg.pkHashRoot,
-    pk0_v: concatPk0V(publicKey, v),
     sep20Contract_dueTime64_prob32: msg.sep20Contract_dueTime64_prob32,
     seenNonces: msg.seenNonces,
     payeeAddrA_amountA: msg.payeeAddrA_amountA,
-    payeeAddrB_amountB: msg.payeeAddrB_amountB,
+    amountB_v: concatAmountV(msg.amountB, v),
     r: r,
     s: s,
   }
@@ -512,6 +517,23 @@ function getPkTail(publicKey) {
 function concatAddressAmount(address, amount) {
   const n = BigInt(address) << 96n | BigInt(amount);
   return '0x' + n.toString(16);
+}
+
+function wrapAmount(amount) {
+  const n = BigInt(amount);
+  return '0x' + n.toString(16);
+}
+
+function concatAmountV(amount, v) {
+  const n = BigInt(amount) << 8n | BigInt(v);
+  return '0x' + n.toString(16);
+}
+
+
+function splitPKToXY(publicKey) {
+  const x = BigInt('0x' + publicKey.substring(4, 68));
+  const y = BigInt('0x' + publicKey.substring(68, 132))
+  return ['0x' + x.toString(16), '0x' + y.toString(16)];
 }
 
 function concatAddrDueTime64Prob32(address, dueTime64, prob32) {
@@ -601,7 +623,7 @@ function getTypedDataAb(verifyingContractAddr, msg) {
         { name: "sep20Contract_dueTime64_prob32", type: "uint256" },
         { name: "seenNonces", type: "uint256" },
         { name: "payeeAddrA_amountA", type: "uint256" },
-        { name: "payeeAddrB_amountB", type: "uint256" },
+        { name: "amountB", type: "uint256" },
       ]
     },
     primaryType: 'Pay',

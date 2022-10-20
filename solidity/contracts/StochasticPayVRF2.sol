@@ -327,7 +327,8 @@ contract StochasticPay_VRF2 {
 			uint prob32 = uint(uint32(tmp));
 			require(rand32 < prob32, "CANNOT_PAY");
 		}
-		bytes32 leaf = bytes32(abi.encodePacked(params.pkX, params.pkY));
+
+		bytes32 leaf = keccak256(abi.encodePacked("\x04", params.pkX, params.pkY));
 		require(MerkleProof.verifyCalldata(proof, params.pkHashRoot, leaf), "VERIFY_FAILED");
 
 		uint amountB = params.amountB_v>>8;
@@ -347,8 +348,10 @@ contract StochasticPay_VRF2 {
 		require(pass, "INCORRECT_NONCES");
 
 		address payeeAddrA = address(bytes20(uint160(params.payeeAddrA_amountA>>96)));
+		bytes32 pubKeyXYHash = keccak256(abi.encodePacked(params.pkX, params.pkY));
+		address payeeAddrB = address(uint160(uint256(pubKeyXYHash)));
+
 		uint amountA = uint(uint96(params.payeeAddrA_amountA));
-		address payeeAddrB = address(bytes20(leaf)); //pay one of the ganychain's validator
 		saveWallet(keyBz, nonces, balance - amountA - amountB);
 		if(amountA != 0) {
 			keyBz = abi.encode(sep20Contract, payeeAddrA);

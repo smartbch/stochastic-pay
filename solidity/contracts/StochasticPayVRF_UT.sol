@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import "./StochasticPayVRF.sol";
+import "./StochasticPayVRF2.sol";
 
-contract StochasticPay_VRF_forUT is StochasticPay_VRF {
+contract StochasticPay_VRF_forUT is StochasticPay_VRF2 {
 
     struct walletData {
         bytes val;
