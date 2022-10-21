@@ -21,10 +21,10 @@ async function main() {
     ]
 
     const provider = ethers.getDefaultProvider("http://192.168.64.4:8545");
-    const stochasticPayVrfAddr = "0x1C5a5C4ADC9b8a41c35299Dc302026e5f2F770a6";
+    const stochasticPayVrfAddr = "0xB034EEDA63199845fD7e96564E08a7a09A7d1C0c";
     const stochasticPayVrf = new ethers.Contract(stochasticPayVrfAddr, abi, provider).connect(deployer);
 
-    const myTokenAddress = "0x01ce7e2a5e332594F9e87e3Ebd5D16fD7B5d7F0b";
+    const myTokenAddress = "0x35d2D8D0ad1d62BABB73991d2b70176476249547";
     const myToken = new ethers.Contract(myTokenAddress, tokenABI, provider).connect(deployer);
 
     // 1. approve allowance

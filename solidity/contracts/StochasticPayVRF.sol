@@ -19,7 +19,7 @@ contract StochasticPay_VRF {
 	bytes32 private constant TYPE_HASH_SR= keccak256(abi.encodePacked("Pay(uint256 payerSalt_pk0,uint256 pkTail,uint256 payeeAddr_dueTime64_prob32,uint256 seenNonces,uint256 sep20Contract_amount)"));
 	// AB: two receivers, A and B; several vrf-pubkeys' owners decides whether the payment happens
 	// usually A is an EOA and B is a contract whose beneficiary own the vrf-pubkeys
-	bytes32 private constant TYPE_HASH_AB = keccak256(abi.encodePacked("Pay(uint256 payerSalt,bytes32 pkHashRoot,uint256 sep20Contract_dueTime64_prob32,uint256 seenNonces,uint256 payeeAddrA_amountA,uint256 payeeAddrB_amountB)"));
+	bytes32 private constant TYPE_HASH_AB = keccak256(abi.encodePacked("Pay(uint256 payerSalt,bytes32 pkHashRoot,uint256 sep20Contract_dueTime64_prob32,uint256 seenNonces,uint256 payeeAddrA_amountA,uint256 amountB)"));
 
 	function registerVrfPubKey(bytes memory vrfPubKey) virtual external {
 		require(vrfPubKey.length == 33, "INCORRECT_VRF_PK_LENGTH");
@@ -147,7 +147,7 @@ contract StochasticPay_VRF {
 			            // prob32: the probability of this payment
 			          uint256 seenNonces, //the last status of nonces seen by the payer
 			          uint256 payeeAddrA_amountA,
-			          uint256 payeeAddrB_amountB
+			          uint256 amountB
 		) public view returns (bytes32) {
 		bytes32 DOMAIN_SEPARATOR = keccak256(abi.encode(
 						     EIP712_DOMAIN_TYPEHASH,
@@ -166,7 +166,7 @@ contract StochasticPay_VRF {
 				  sep20Contract_dueTime64_prob32,
 				  seenNonces,
 				  payeeAddrA_amountA,
-				  payeeAddrB_amountB
+				  amountB
 			))
 		));
 	}
@@ -191,7 +191,7 @@ contract StochasticPay_VRF {
 			     uint256 sep20Contract_dueTime64_prob32,
 			     uint256 seenNonces,
 			     uint256 payeeAddrA_amountA,
-			     uint256 payeeAddrB_amountB,
+			     uint256 amountB,
 			     uint8 v,
 			     bytes32 r, bytes32 s) public view returns (address) {
 		bytes32 eip712Hash = getEIP712Hash_ab(payerSalt,
@@ -199,7 +199,7 @@ contract StochasticPay_VRF {
 					              sep20Contract_dueTime64_prob32,
 					              seenNonces,
 					              payeeAddrA_amountA,
-					              payeeAddrB_amountB);
+					              amountB);
 		return ecrecover(eip712Hash, v, r, s);
 	}
 
@@ -307,13 +307,12 @@ contract StochasticPay_VRF {
 
 	struct Params {
 		uint256 payerSalt;
-		uint256 pkTail;
-		bytes32 pkHashRoot;
-		uint256 pk0_v;
+		uint256 pkX; uint256 pkY; // one of the ganychain validators' pubkeys
+		bytes32 pkHashRoot; //merkle root of ganychain validators' pubkeys
 		uint256 sep20Contract_dueTime64_prob32;
 		uint256 seenNonces;
 		uint256 payeeAddrA_amountA;
-		uint256 payeeAddrB_amountB;
+		uint256 amountB_v;
 		bytes32 r;
 		bytes32 s;
 	}
@@ -324,22 +323,22 @@ contract StochasticPay_VRF {
 		{
 			uint64 dueTime64 = uint64(tmp>>32);
 			require(block.timestamp < dueTime64, "EXPIRED");
-			uint rand32 = getRand32_ab(params.payerSalt, uint8(params.pk0_v>>8), params.pkTail, pi);
+			uint rand32 = getRand32_ab(params.payerSalt, uint8(2|(params.pkY&1)), params.pkX, pi);
 			uint prob32 = uint(uint32(tmp));
 			require(rand32 < prob32, "CANNOT_PAY");
 		}
-		tmp = params.pk0_v;
-		bytes32 root = params.pkHashRoot;
-		bytes32 leaf = bytes32(abi.encodePacked(uint8(tmp>>8), params.pkTail<<8));
-		require(MerkleProof.verifyCalldata(proof, params.pkHashRoot, leaf), "VERIFY_FAILED");
 
+		bytes32 pubKeyXYHash = keccak256(abi.encodePacked(params.pkX, params.pkY));
+		require(MerkleProof.verifyCalldata(proof, params.pkHashRoot, pubKeyXYHash), "VERIFY_FAILED");
+
+		uint amountB = params.amountB_v>>8;
 		address payerAddr = getPayer_ab(params.payerSalt,
 					        params.pkHashRoot,
 					        params.sep20Contract_dueTime64_prob32,
 					        params.seenNonces,
 					        params.payeeAddrA_amountA,
-					        params.payeeAddrB_amountB,
-					        uint8(tmp),
+					        amountB,
+					        uint8(params.amountB_v),
 					        params.r, params.s);
 
 		bytes memory keyBz = abi.encode(sep20Contract, payerAddr);
@@ -349,9 +348,9 @@ contract StochasticPay_VRF {
 		require(pass, "INCORRECT_NONCES");
 
 		address payeeAddrA = address(bytes20(uint160(params.payeeAddrA_amountA>>96)));
+		address payeeAddrB = address(uint160(uint256(pubKeyXYHash)));
+
 		uint amountA = uint(uint96(params.payeeAddrA_amountA));
-		address payeeAddrB = address(bytes20(uint160(params.payeeAddrB_amountB>>96)));
-		uint amountB = uint(uint96(params.payeeAddrB_amountB));
 		saveWallet(keyBz, nonces, balance - amountA - amountB);
 		if(amountA != 0) {
 			keyBz = abi.encode(sep20Contract, payeeAddrA);

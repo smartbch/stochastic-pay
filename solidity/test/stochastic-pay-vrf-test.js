@@ -2,9 +2,8 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { TypedDataUtils } = require('ethers-eip712');
 const { MerkleTree } = require('merkletreejs');
-const keccak256 = require('keccak256');
 
-describe("StochasticPay_VRF2", function () {
+describe("StochasticPay_VRF", function () {
   const payerSalt = ethers.utils.id("payerSalt");
   const payeeASalt = ethers.utils.id("payeeASalt");
   const payeeBSalt = ethers.utils.id("payeeBSalt");
@@ -43,10 +42,8 @@ describe("StochasticPay_VRF2", function () {
 
     const validators = [payer.publicKey, payeeA.publicKey, payeeB.publicKey];
     console.log("validators: ", JSON.stringify(validators));
-    const leafNodes = validators.map((v) =>
-        ethers.utils.keccak256(v)
-    );
-    merkleTree = new MerkleTree(leafNodes, keccak256, { sortPairs: true });
+    const leafNodes = [extractPKXY(payer.publicKey), extractPKXY(payeeA.publicKey),extractPKXY(payeeB.publicKey)];
+    merkleTree = new MerkleTree(leafNodes, ethers.utils.keccak256, { hashLeaves: true, sortPairs: true });
     console.log("---------");
     console.log("Merke Tree");
     console.log("---------");
@@ -280,7 +277,7 @@ describe("StochasticPay_VRF2", function () {
     }
 
 
-    const payeeBPubKeyHash = ethers.utils.keccak256(payeeB.publicKey);
+    const payeeBPubKeyHash = ethers.utils.keccak256(extractPKXY(payeeB.publicKey));
     console.log("payeeBPubKeyHash: ", payeeBPubKeyHash);
     const proofHex = merkleTree.getHexProof(payeeBPubKeyHash);
     console.log("proof: ", proofHex);
@@ -315,7 +312,7 @@ describe("StochasticPay_VRF2", function () {
       amountB: wrapAmount(50),
     }
 
-    const payeeBPubKeyHash = ethers.utils.keccak256(payeeB.publicKey);
+    const payeeBPubKeyHash = ethers.utils.keccak256(extractPKXY(payeeB.publicKey));
     console.log("payeeBPubKeyHash: ", payeeBPubKeyHash);
     const proofHex = merkleTree.getHexProof(payeeBPubKeyHash);
     console.log("proof: ", proofHex);
@@ -337,7 +334,7 @@ describe("StochasticPay_VRF2", function () {
       amountB: wrapAmount(50),
     }
 
-    const payeeBPubKeyHash = ethers.utils.keccak256(payeeB.publicKey);
+    const payeeBPubKeyHash = ethers.utils.keccak256(extractPKXY(payeeB.publicKey));
     console.log("payeeBPubKeyHash: ", payeeBPubKeyHash);
     const proofHex = merkleTree.getHexProof(payeeBPubKeyHash);
     console.log("proof: ", proofHex);
@@ -377,7 +374,7 @@ describe("StochasticPay_VRF2", function () {
       amountB: wrapAmount(50),
     }
 
-    const payeeBPubKeyHash = ethers.utils.keccak256(payeeB.publicKey);
+    const payeeBPubKeyHash = ethers.utils.keccak256(extractPKXY(payeeB.publicKey));
     console.log("payeeBPubKeyHash: ", payeeBPubKeyHash);
     const proofHex = merkleTree.getHexProof(payeeBPubKeyHash);
     console.log("proof: ", proofHex);
@@ -535,6 +532,12 @@ function splitPKToXY(publicKey) {
   const y = BigInt('0x' + publicKey.substring(68, 132))
   return ['0x' + x.toString(16), '0x' + y.toString(16)];
 }
+
+function extractPKXY(publicKey) {
+  const xy = BigInt('0x' + publicKey.substring(4, 132));
+  return '0x' + xy.toString(16);
+}
+
 
 function concatAddrDueTime64Prob32(address, dueTime64, prob32) {
   const n = BigInt(address) << 96n
