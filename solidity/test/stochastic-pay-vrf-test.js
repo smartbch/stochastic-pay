@@ -407,6 +407,15 @@ describe("StochasticPay_VRF", function () {
     expect(pubKey.length === 2).to.be.ok; // empty bytes "0x"
   });
 
+
+  // ----------------------------------------------------------------
+
+  it("testBytes32Split: OK", async function () {
+    const beta ="0x0102030400000000000000000000000000000000000000000000000000000000"
+    const betaInt32 = await stochasticPayVrf.connect(payer).testBytes32Split(beta);
+    console.log("betaInt32: ", betaInt32);
+  });
+
 });
 
 function concatContractAddrAndOwnerAddr(contract, owner) {

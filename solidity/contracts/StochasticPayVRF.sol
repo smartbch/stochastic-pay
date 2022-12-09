@@ -230,6 +230,7 @@ contract StochasticPay_VRF {
 	function getRand32_ab(uint256 alpha, uint8 pk0, uint256 pkTail, bytes calldata pi) virtual internal returns (uint) {
 		(bool ok, bytes memory beta) = address(VRF_PRECOMPILE).call(abi.encodePacked(alpha, pk0, pkTail, pi));
 		require(ok, "VRF_FAIL");
+		require(beta.length > 3, "beta is invalid");
 		return (uint(uint8(beta[3]))<<24) | (uint(uint8(beta[2]))<<16) |
 			 (uint(uint8(beta[1]))<<8) | (uint(uint8(beta[0])));
 	}

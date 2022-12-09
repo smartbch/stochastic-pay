@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 import "./StochasticPayVRF.sol";
+import "hardhat/console.sol";
 
 contract StochasticPay_VRF_forUT is StochasticPay_VRF {
 
@@ -72,5 +73,11 @@ contract StochasticPay_VRF_forUT is StochasticPay_VRF {
             return;
         }
         vrfPubKeyMap[keyBz].isExist = false;
+    }
+
+    function testBytes32Split(bytes memory beta) public view returns (uint) {
+        require(beta.length == 32, "BETA_IS_INVALID");
+        return (uint(uint8(beta[3]))<<24) | (uint(uint8(beta[2]))<<16) |
+        (uint(uint8(beta[1]))<<8) | (uint(uint8(beta[0])));
     }
 }
