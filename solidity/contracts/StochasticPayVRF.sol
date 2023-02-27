@@ -16,10 +16,12 @@ contract StochasticPay_VRF {
 	bytes32 private constant DAPP_HASH = keccak256(abi.encodePacked("stochastic_payment"));
 	bytes32 private constant VERSION_HASH = keccak256(abi.encodePacked("v0.1.0"));
 	// SR: single receiver; the vrf-pubkey's owner decides whether the payment happens.
-	bytes32 private constant TYPE_HASH_SR= keccak256(abi.encodePacked("Pay(uint256 payerSalt_pk0,uint256 pkTail,uint256 payeeAddr_dueTime64_prob32,uint256 seenNonces,uint256 sep20Contract_amount)"));
+	bytes32 private constant TYPE_HASH_SR= keccak256(abi.encodePacked("Pay(uint256 payerSalt_pk0,uint256 pkTail,uint256 payeeAddr_dueTime64_prob32,uint160 seenNonces,uint256 sep20Contract_amount)"));
 	// AB: two receivers, A and B; several vrf-pubkeys' owners decides whether the payment happens
 	// usually A is an EOA and B is a contract whose beneficiary own the vrf-pubkeys
-	bytes32 private constant TYPE_HASH_AB = keccak256(abi.encodePacked("Pay(uint256 payerSalt,bytes32 pkHashRoot,uint256 sep20Contract_dueTime64_prob32,uint256 seenNonces,uint256 payeeAddrA_amountA,uint256 amountB)"));
+	bytes32 private constant TYPE_HASH_AB = keccak256(abi.encodePacked("Pay(uint256 payerSalt,bytes32 pkHashRoot,uint256 sep20Contract_dueTime64_prob32,uint160 seenNonces,uint256 payeeAddrA_amountA,uint256 amountB)"));
+
+	mapping (address => mapping (address => uint)) walletMap;
 
 	function registerVrfPubKey(bytes memory vrfPubKey) virtual external {
 		require(vrfPubKey.length == 33, "INCORRECT_VRF_PK_LENGTH");
@@ -69,44 +71,31 @@ contract StochasticPay_VRF {
 		require(success && ret, "trans-fail");
 	}
 
-	function saveWallet(bytes memory keyBz, uint nonces, uint balance) virtual internal {
-		bytes memory valueBz = abi.encode(nonces, balance);
-		(bool success, /*bytes memory _notUsed*/) = SEP101Contract.delegatecall(
-			abi.encodeWithSignature("set(bytes,bytes)", keyBz, valueBz));
-		require(success, "SEP101_SET_FAIL");
+	function saveWallet(address token, address owner, uint160 nonces, uint96 balance) virtual internal {
+		uint wallet = uint(nonces) | balance;
+		walletMap[token][owner] = wallet;
 	}
 
-	function loadWallet(bytes memory keyBz) virtual public returns (uint nonces, uint balance) {
-		(bool success, bytes memory data) = SEP101Contract.delegatecall(
-			abi.encodeWithSignature("get(bytes)", keyBz));
-
-		require(success && (data.length == 32 * 2 || data.length == 32 * 4));
-		if (data.length == 32 * 2) {
-			return (0, 0);
-		}
-
-		bytes memory valueBz;
-		assembly {valueBz := add(data, 64)}
-		return abi.decode(valueBz, (uint, uint));
+	function loadWallet(address token, address owner) virtual public returns (uint160 nonces, uint96 balance) {
+		uint wallet = walletMap[token][owner];
+		return (uint160(wallet>>96), uint96(wallet));
 	}
 
 	function deposit(address owner, uint sep20Contract_amount) public payable {
 		address sep20Contract = address(uint160(sep20Contract_amount>>96));
 		uint amount = uint96(sep20Contract_amount);
 		safeReceive(sep20Contract, amount);
-		bytes memory keyBz = abi.encode(sep20Contract, owner);
-		(uint nonces, uint balance) = loadWallet(keyBz);
-		saveWallet(keyBz, nonces, balance + amount);
+		(uint160 nonces, uint96 balance) = loadWallet(sep20Contract, owner);
+		saveWallet(sep20Contract, owner, nonces, uint96(balance + amount));
 	}
 
 	function withdraw(uint sep20Contract_amount) public {
 		address sep20Contract = address(uint160(sep20Contract_amount>>96));
 		uint amount = uint96(sep20Contract_amount);
-		bytes memory keyBz = abi.encode(sep20Contract, msg.sender);
-		(uint nonces, uint balance) = loadWallet(keyBz);
+		(uint160 nonces, uint96 balance) = loadWallet(sep20Contract, msg.sender);
 		require(balance >= amount, "NOT_ENOUGH_COINS");
 		safeTransfer(sep20Contract, msg.sender, amount);
-		saveWallet(keyBz, nonces, balance - amount);
+		saveWallet(sep20Contract, msg.sender, nonces, uint96(balance - amount));
 	}
 
 	function getEIP712Hash_sr(uint256 payerSalt_pk0,
@@ -115,7 +104,7 @@ contract StochasticPay_VRF {
 			          uint256 payeeAddr_dueTime64_prob32, //payeeAddr: the address of payee
 			            // dueTime64: when the payment commitment expires
 			            // prob32: the probability of this payment
-			          uint256 seenNonces, //the last status of nonces seen by the payer
+			          uint160 seenNonces, //the last status of nonces seen by the payer
 			          uint256 sep20Contract_amount // which coin and how many coins 
 		) public view returns (bytes32) {
 		bytes32 DOMAIN_SEPARATOR = keccak256(abi.encode(
@@ -145,7 +134,7 @@ contract StochasticPay_VRF {
 			          uint256 sep20Contract_dueTime64_prob32,
 			            // dueTime64: when the payment commitment expires
 			            // prob32: the probability of this payment
-			          uint256 seenNonces, //the last status of nonces seen by the payer
+			          uint160 seenNonces, //the last status of nonces seen by the payer
 			          uint256 payeeAddrA_amountA,
 			          uint256 amountB
 		) public view returns (bytes32) {
@@ -174,7 +163,7 @@ contract StochasticPay_VRF {
 	function getPayer_sr(uint256 payerSalt_pk0_v,
 			     uint256 pkTail,
 			     uint256 payeeAddr_dueTime64_prob32,
-			     uint256 seenNonces,
+			     uint160 seenNonces,
 			     uint256 sep20Contract_amount,
 			     bytes32 r, bytes32 s) public view returns (address) {
 		bytes32 eip712Hash = getEIP712Hash_sr(payerSalt_pk0_v>>8,
@@ -189,7 +178,7 @@ contract StochasticPay_VRF {
 	function getPayer_ab(uint256 payerSalt,
 			     bytes32 pkHashRoot,
 			     uint256 sep20Contract_dueTime64_prob32,
-			     uint256 seenNonces,
+			     uint160 seenNonces,
 			     uint256 payeeAddrA_amountA,
 			     uint256 amountB,
 			     uint8 v,
@@ -241,7 +230,7 @@ contract StochasticPay_VRF {
 		uint256 payeeAddr_dueTime64_prob32; //payeeAddr: the address of payee
 		  // dueTime64: when the payment commitment expires
 		  // prob32: the probability of this payment
-		uint256 seenNonces; //payer's current allowance to this contract
+		uint160 seenNonces; //payer's current allowance to this contract
 		uint256 sep20Contract_amount; // which coin and how many coins 
 		bytes32 r;
 		bytes32 s;
@@ -267,8 +256,7 @@ contract StochasticPay_VRF {
 					        params.sep20Contract_amount,
 					        params.r, params.s);
 		address sep20Contract = address(bytes20(uint160(params.sep20Contract_amount>>96)));
-		bytes memory keyBz = abi.encode(sep20Contract, payerAddr);
-		(uint nonces, uint balance) = loadWallet(keyBz);
+		(uint160 nonces, uint96 balance) = loadWallet(sep20Contract, payerAddr);
 		bool pass;
 		(nonces, pass) = checkAndUpdateNonces(nonces, params.seenNonces, params.payerSalt_pk0_v>>16);
 		require(pass, "INCORRECT_NONCES");
@@ -277,22 +265,25 @@ contract StochasticPay_VRF {
 		if(randProb != 0) {
 			amount = amount * randProb / (8*256);
 		}
-		saveWallet(keyBz, nonces, balance - amount);
-		keyBz = abi.encode(sep20Contract, payeeAddr);
-		(nonces, balance) = loadWallet(keyBz);
-		saveWallet(keyBz, nonces, balance + amount);
+		saveWallet(sep20Contract, payerAddr, nonces, uint96(balance - amount));
+		(nonces, balance) = loadWallet(sep20Contract, payeeAddr);
+		saveWallet(sep20Contract, payeeAddr, nonces, uint96(balance + amount));
 	}
 
-	function checkAndUpdateNonces(uint currNonces, uint seenNonces, uint salt) pure public returns (uint, bool) {
+	function checkAndUpdateNonces(uint160 currNonces, uint160 seenNonces, uint salt) pure public returns (uint160, bool) {
 		unchecked {
-			uint allMasks = 0;
-			uint pick = (7<<5);
+			uint32 top32 = uint32(currNonces>>128);
+			uint32 seenTop32 = uint32(seenNonces>>128);
+			if(top32 - seenTop32 >= 0x10000) { // prevent wrapping of 16-bit nonces
+				return (0, false);
+			}
+			uint160 allMasks = 0;
 			bool anyMatch = false;
-			uint newNonces = 0;
-			for(uint i=0; i<3; i++) {
-				uint shift = (salt&pick);
+			uint160 newNonces = 0;
+			for(uint i=0; i<3; i++) { // pick three nonces in a pseudo-random way
+				uint shift = (salt&0x70);
 				salt = salt >> 8;
-				uint mask = (0xFFFFFFFF << shift);
+				uint160 mask = uint160(0xFFFF << shift);
 				if((currNonces&mask) == (seenNonces&mask)) {
 					anyMatch = true;
 				}
@@ -302,7 +293,8 @@ contract StochasticPay_VRF {
 			if(!anyMatch) {
 				return (0, false);
 			}
-			return ((newNonces&allMasks)|(currNonces&~allMasks), true);
+			top32++;
+			return ((uint160(top32)<<128) | newNonces | (currNonces&~allMasks), true);
 		}
 	}
 
@@ -311,7 +303,7 @@ contract StochasticPay_VRF {
 		uint256 pkX; uint256 pkY; // one of the ganychain validators' pubkeys
 		bytes32 pkHashRoot; //merkle root of ganychain validators' pubkeys
 		uint256 sep20Contract_dueTime64_prob32;
-		uint256 seenNonces;
+		uint160 seenNonces;
 		uint256 payeeAddrA_amountA;
 		uint256 amountB_v;
 		bytes32 r;
@@ -342,8 +334,7 @@ contract StochasticPay_VRF {
 					        uint8(params.amountB_v),
 					        params.r, params.s);
 
-		bytes memory keyBz = abi.encode(sep20Contract, payerAddr);
-		(uint nonces, uint balance) = loadWallet(keyBz);
+		(uint160 nonces, uint96 balance) = loadWallet(sep20Contract, payerAddr);
 		bool pass;
 		(nonces, pass) = checkAndUpdateNonces(nonces, params.seenNonces, params.payerSalt);
 		require(pass, "INCORRECT_NONCES");
@@ -352,15 +343,13 @@ contract StochasticPay_VRF {
 		address payeeAddrB = address(uint160(uint256(pubKeyXYHash)));
 
 		uint amountA = uint(uint96(params.payeeAddrA_amountA));
-		saveWallet(keyBz, nonces, balance - amountA - amountB);
+		saveWallet(sep20Contract, payerAddr, nonces, uint96(balance - amountA - amountB));
 		if(amountA != 0) {
-			keyBz = abi.encode(sep20Contract, payeeAddrA);
-			(nonces, balance) = loadWallet(keyBz);
-			saveWallet(keyBz, nonces, balance + amountA);
+			(nonces, balance) = loadWallet(sep20Contract, payeeAddrA);
+			saveWallet(sep20Contract, payeeAddrA, nonces, uint96(balance + amountA));
 		}
-		keyBz = abi.encode(sep20Contract, payeeAddrB);
-		(nonces, balance) = loadWallet(keyBz);
-		saveWallet(keyBz, nonces, balance + amountB);
+		(nonces, balance) = loadWallet(sep20Contract, payeeAddrB);
+		saveWallet(sep20Contract, payeeAddrB, nonces, uint96(balance + amountB));
 	}
 }
 
