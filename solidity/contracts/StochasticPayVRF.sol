@@ -71,12 +71,12 @@ contract StochasticPay_VRF {
 		require(success && ret, "trans-fail");
 	}
 
-	function saveWallet(address token, address owner, uint160 nonces, uint96 balance) virtual internal {
-		uint wallet = uint(nonces) | balance;
+	function saveWallet(address token, address owner, uint160 nonces, uint96 balance) internal {
+		uint wallet = uint(nonces)<<96 | balance;
 		walletMap[token][owner] = wallet;
 	}
 
-	function loadWallet(address token, address owner) virtual public returns (uint160 nonces, uint96 balance) {
+	function loadWallet(address token, address owner) public view returns (uint160, uint96) {
 		uint wallet = walletMap[token][owner];
 		return (uint160(wallet>>96), uint96(wallet));
 	}

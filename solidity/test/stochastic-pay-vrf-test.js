@@ -76,7 +76,7 @@ describe("StochasticPay_VRF", function () {
 
 
   it("loadWallet: OK", async function () {
-    const [nonces, balance] = await stochasticPayVrf.loadWallet(concatContractAddrAndOwnerAddr(myToken.address, payer.address));
+    const [nonces, balance] = await stochasticPayVrf.loadWallet(myToken.address, payer.address);
     console.log("Nonces: " + nonces, "Balance: " + balance)
     expect(balance).to.equal(payerAllowance);
   });
@@ -84,7 +84,7 @@ describe("StochasticPay_VRF", function () {
   it("getEIP712Hash_sr", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0x12345678;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey)
     const payerSalt_pk0 = concatPayerSaltPk0(payerSalt240, payerPubKeyHash);
@@ -110,7 +110,7 @@ describe("StochasticPay_VRF", function () {
   it("getPayer_sr", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0x12345678;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey)
     const payerSalt_pk0 = concatPayerSaltPk0(payerSalt240, payerPubKeyHash);
@@ -132,7 +132,7 @@ describe("StochasticPay_VRF", function () {
   it("payToSingleReciever:ok", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0xFFFFFFFF;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey)
     const payerSalt_pk0 = concatPayerSaltPk0(payerSalt240, payerPubKeyHash);
@@ -150,8 +150,8 @@ describe("StochasticPay_VRF", function () {
     await payToSingleReciever(stochasticPayVrf, msg, payerSalt_pk0, pkTail, r, s, v);
     console.log("Pay SR done!");
 
-    let payerBalance = await getBalance(stochasticPayVrf,payer.address, myToken.address)
-    let payeeABalance = await getBalance(stochasticPayVrf,payeeA.address, myToken.address)
+    const [ payerNonce , payerBalance] = await stochasticPayVrf.loadWallet(myToken.address, payer.address);
+    const [ payeeNonce , payeeABalance] = await stochasticPayVrf.loadWallet(myToken.address, payeeA.address);
 
     expect(payerBalance).to.equal(1);
     expect(payeeABalance).to.equal(payAmount);
@@ -160,7 +160,7 @@ describe("StochasticPay_VRF", function () {
   it("payToSingleReciever:failed:EXPIRED", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) - 3600;
     const prob32 = 0xFFFFFFFF;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey)
     const payerSalt_pk0 = concatPayerSaltPk0(payerSalt240, payerPubKeyHash);
@@ -181,7 +181,7 @@ describe("StochasticPay_VRF", function () {
   it("payToSingleReciever:failed:CANNOT_PAY", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0x00000000;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey)
     const payerSalt_pk0 = concatPayerSaltPk0(payerSalt240, payerPubKeyHash);
@@ -202,7 +202,7 @@ describe("StochasticPay_VRF", function () {
   it("payToSingleReciever:failed:INCORRECT_NONCES", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0xFFFFFFFF;
-    const seenNonces = 0x1111111111111111111111111111111111111111111111111111111111111111n  // 256 bits
+    const seenNonces = 0x1111111111111111111111111111111111111111n  // 160 bits
 
     const payerPubKeyHash = ethers.utils.keccak256(payer.publicKey)
     const payerSalt_pk0 = concatPayerSaltPk0(payerSalt240, payerPubKeyHash);
@@ -225,7 +225,7 @@ describe("StochasticPay_VRF", function () {
   it("getEIP712Hash_ab", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0x12345678;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const msg = {
       payerSalt: payerSalt,
@@ -246,7 +246,7 @@ describe("StochasticPay_VRF", function () {
   it("getPayer_ab", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0x12345678;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const msg = {
       payerSalt: payerSalt,
@@ -265,7 +265,7 @@ describe("StochasticPay_VRF", function () {
   it("payToAB:ok", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0xFFFFFFFF;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const msg = {
       payerSalt: payerSalt,
@@ -285,13 +285,9 @@ describe("StochasticPay_VRF", function () {
     await payToAB(stochasticPayVrf, msg, proofHex, payeeB.publicKey, r, s, v);
 
     console.log("Pay AB done!");
-    let payerBalance = await getBalance(stochasticPayVrf, payer.address, myToken.address);
-    let payeeABalance = await getBalance(stochasticPayVrf, payeeA.address, myToken.address);
-    let payeeBBalance = await getBalance(stochasticPayVrf, payeeB.address, myToken.address);
-
-    console.log(payerBalance)
-    console.log(payeeABalance)
-    console.log(payeeBBalance)
+    const [ payerNonce , payerBalance] = await stochasticPayVrf.loadWallet(myToken.address, payer.address);
+    const [ payeeANonce , payeeABalance] = await stochasticPayVrf.loadWallet(myToken.address, payeeA.address);
+    const [ payeeBNonce , payeeBBalance] = await stochasticPayVrf.loadWallet(myToken.address, payeeB.address);
 
     expect(payerBalance).to.equal(1);
     expect(payeeABalance).to.equal(50);
@@ -301,7 +297,7 @@ describe("StochasticPay_VRF", function () {
   it("payToAB:EXPIRED", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) - 3600;
     const prob32 = 0xFFFFFFFF;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const msg = {
       payerSalt: payerSalt,
@@ -323,7 +319,7 @@ describe("StochasticPay_VRF", function () {
   it("payToAB:CANNOT_PAY", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0x00000000;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const msg = {
       payerSalt: payerSalt,
@@ -345,7 +341,7 @@ describe("StochasticPay_VRF", function () {
   it("payToAB:VERIFY_FAILED", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0xFFFFFFFF;
-    const seenNonces = 0x0000000000000000000000000000000000000000000000000000000000000000n  // 256 bits
+    const seenNonces = 0x0000000000000000000000000000000000000000n  // 160 bits
 
     const msg = {
       payerSalt: payerSalt,
@@ -363,7 +359,7 @@ describe("StochasticPay_VRF", function () {
   it("payToAB:INCORRECT_NONCES", async function () {
     const dueTime64 = Math.floor(Date.now() / 1000) + 3600;
     const prob32 = 0xFFFFFFFF;
-    const seenNonces = 0x1111111111111111111111111111111111111111111111111111111111111111n  // 256 bits
+    const seenNonces = 0x1111111111111111111111111111111111111111n  // 160 bits
 
     const msg = {
       payerSalt: payerSalt,
@@ -603,7 +599,7 @@ function getTypedDataSr(verifyingContractAddr, msg) {
         { name: "payerSalt_pk0", type: "uint256" },
         { name: "pkTail", type: "uint256" },
         { name: "payeeAddr_dueTime64_prob32", type: "uint256" },
-        { name: "seenNonces", type: "uint256" },
+        { name: "seenNonces", type: "uint160" },
         { name: "sep20Contract_amount", type: "uint256" },
       ]
     },
@@ -633,7 +629,7 @@ function getTypedDataAb(verifyingContractAddr, msg) {
         { name: "payerSalt", type: "uint256" },
         { name: "pkHashRoot", type: "bytes32" },
         { name: "sep20Contract_dueTime64_prob32", type: "uint256" },
-        { name: "seenNonces", type: "uint256" },
+        { name: "seenNonces", type: "uint160" },
         { name: "payeeAddrA_amountA", type: "uint256" },
         { name: "amountB", type: "uint256" },
       ]
