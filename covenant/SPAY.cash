@@ -1,0 +1,39 @@
+pragma cashscript ^0.7.0;
+
+// The steps of a stochastic payment:
+// 
+// 0. The sender and the recipient negotiate about the payment value and probability.
+// 1. The recipient gives the sender a hash, which is the hash160 result of a secret.
+// 2. The sender signs a transaction and give it to the sender. In this transaction, a covenant is created 
+//    with the recipient's hash and a random salt selected by the sender.
+// 3. The recipient will broadcast this transaction if he can spend this covenant because hash160(salt+secret)
+//    is less than the negotiated probability.
+// 4. The recipient will forget this transaction if he cannot spend this covenant.
+// 
+// If the recipient is not honest and broadcast this transaction when he cannot spend this covenant, the sender
+// will refund this covenant after the expiration time. This dishonest behavior will be recorded on chain.
+// The sender only loses a little miner fee, while the dishonest recipient will lose reputation.
+
+// Stochastic Payment
+contract SPAY(bytes20 senderPKH,
+              bytes20 recipientPKH,
+              bytes20 hash, // provided by the recipient
+              bytes4 salt, // provided by the sender
+              int expiration,
+              int probability) {
+
+    // receive by recipient
+    function receive(sig recipientSig, pubkey recipientPK, bytes32 secret) {
+        require(hash160(recipientPK) == recipientPKH);
+        require(checkSig(recipientSig, recipientPK));
+        require(hash160(secret) == hash);
+        require(int(bytes(hash160(salt+secret))) < probability);
+    }
+
+    // refund by sender
+    function refund(sig senderSig, pubkey senderPK) {
+        require(hash160(senderPK) == senderPKH);
+        require(checkSig(senderSig, senderPK));
+        require(tx.age >= expiration);
+    }
+}
