@@ -4,7 +4,7 @@ pragma cashscript ^0.7.0;
 // 
 // 0. The sender and the recipient negotiate about the payment value and probability.
 // 1. The recipient gives the sender a hash, which is the hash160 result of a secret.
-// 2. The sender signs a transaction and give it to the sender. In this transaction, a covenant is created 
+// 2. The sender signs a transaction and give it to the receiver. In this transaction, a covenant is created
 //    with the recipient's hash and a random salt selected by the sender.
 // 3. The recipient will broadcast this transaction if he can spend this covenant because hash160(salt+secret)
 //    is less than the negotiated probability.
