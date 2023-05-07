@@ -25,7 +25,7 @@ var (
 type SpayCovenant struct {
 	senderPkh    [20]byte // 20 bytes
 	recipientPkh [20]byte // 20 bytes
-	hash         [32]byte // 32 bytes, provided by the recipient
+	hash         [20]byte // 32 bytes, provided by the recipient
 	salt         [4]byte  // 4 bytes, provided by the sender
 	expiration   int64
 	probability  int64
@@ -33,14 +33,14 @@ type SpayCovenant struct {
 }
 
 func NewMainnetCovenant(
-	senderPkh, recipientPkh [20]byte, hash [32]byte, salt [4]byte, expiration, probability int64,
+	senderPkh, recipientPkh, hash [20]byte, salt [4]byte, expiration, probability int64,
 ) (*SpayCovenant, error) {
 
 	return NewCovenant(senderPkh, recipientPkh, hash, salt, expiration, probability, &chaincfg.MainNetParams)
 }
 
 func NewCovenant(
-	senderPkh, recipientPkh [20]byte, hash [32]byte, salt [4]byte, expiration, probability int64,
+	senderPkh, recipientPkh, hash [20]byte, salt [4]byte, expiration, probability int64,
 	net *chaincfg.Params,
 ) (*SpayCovenant, error) {
 
@@ -98,7 +98,7 @@ func (c *SpayCovenant) GetP2SHAddress() (string, error) {
 }
 
 func (c *SpayCovenant) MakeReceiveTx(
-	txid []byte, vout uint32, inAmt int64,  // input info
+	txid []byte, vout uint32, inAmt int64, // input info
 	toAddr bchutil.Address, minerFee int64, // output info
 	secret []byte,
 	privKey *bchec.PrivateKey,
@@ -107,7 +107,7 @@ func (c *SpayCovenant) MakeReceiveTx(
 }
 
 func (c *SpayCovenant) MakeRefundTx(
-	txid []byte, vout uint32, inAmt int64,  // input info
+	txid []byte, vout uint32, inAmt int64, // input info
 	toAddr bchutil.Address, minerFee int64, // output info
 	privKey *bchec.PrivateKey,
 ) (*wire.MsgTx, error) {
@@ -115,7 +115,7 @@ func (c *SpayCovenant) MakeRefundTx(
 }
 
 func (c *SpayCovenant) makeReceiveOrRefundTx(
-	txid []byte, vout uint32, inAmt int64,  // input info
+	txid []byte, vout uint32, inAmt int64, // input info
 	toAddr bchutil.Address, minerFee int64, // output info
 	secret []byte,
 	privKey *bchec.PrivateKey,
@@ -152,7 +152,7 @@ func (c *SpayCovenant) makeReceiveOrRefundTx(
 func (c *SpayCovenant) MakeSPAYTx(
 	fromKey *bchec.PrivateKey,
 	txid []byte, vout uint32, inAmt int64, // input info
-	outAmt int64,                          // output info
+	outAmt int64, // output info
 	minerFee int64,
 ) (*wire.MsgTx, error) {
 	fromPk := fromKey.PubKey().SerializeCompressed()
